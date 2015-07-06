@@ -35,7 +35,41 @@ int getSocketListner(char *port)
         return -1;    
     }
 
-    for(p = servinfo; p != NULL; p = p->ai_next) {
+    //Go through interfaces
+    for(p = servinfo; p != NULL; p = p->ai_next) { 
+        //Make a socket of this one
+        if((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocole)) ==-1) {
+            continue;
+        }
         
+        //Check if addr already in use
+        if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+            perror("setsockopt");
+            close(sockfd);
+            freeaddrinfo(servinfo);
+            return -2;
+        }
+        
+        //Bind this socket to this local IP addr
+        if(bind(sockfd, p->ai_addr, p->addrlen) == -1) {
+            close(sockfd);
+            continue;
+        }
+
+        break;
     }
+
+    freeaddrinfo(servinfo);
+    
+    if(p == NULL) {
+        fprintf(stderr, "webserver: failed to find local address\n");
+        return -3;
+    }
+
+    if(listen(sockfd, BACKLOG)  == -1) {
+        close(sockfd);
+        return -4;
+    }
+
+    return sockfd;
 }
