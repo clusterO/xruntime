@@ -22,7 +22,7 @@ extern struct CacheEntry *allocateEntry(char *path, char *content_type, void *co
 extern void freeEntry(struct CacheEntry *entry);
 extern struct cache *createCache(int max_size, int hashsize);
 extern void freeCache(struct cache *cache);
-extern void put(struct cache *cache, char *path, char *content_type, void *content, int content_length);
-extern struct CacheEntry *get(struct cache *cache, char *path);
+extern void cput(struct cache *cache, char *path, char *content_type, void *content, int content_length);
+extern struct CacheEntry *cget(struct cache *cache, char *path);
 
 #endif
