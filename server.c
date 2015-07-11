@@ -27,7 +27,7 @@ int response(int fd, char *header, char *contentType, void *body, int contentLen
 
     //Implementation
     
-    int rv = send(fd, response, responseLength, 0);
+    int rv = send(fd, response, maxResponseSize, 0);
     if(rv < 0) perror("send");
     return rv;
 }
@@ -41,7 +41,7 @@ void notFound(int fd)
 {
     char filePath[4096];
     struct Data *fileData;
-    char *MimeType;
+    char *mimeType;
 
     snprintf(filePath, sizeof filePath, "%s/404.html", SERVER_FILES);
     fileData = loadFile(filePath);
@@ -73,10 +73,10 @@ void request(int fd, struct Cache *cache)
 int main(void) 
 {
     int newfd;
-    struct sockAddrStorage addr;
+    struct sockaddr_storage addr;
     char s[INET6_ADDRSTRLEN];
     struct Cache *cache = createCache(10, 0);
-    int listenfd = getListener(PORT);
+    int listenfd = getSocketListner(PORT);
 
     if(listenfd < 0) {
         fprintf(stderr, "webserver: fatal error getting listening socket\n");
@@ -94,7 +94,7 @@ int main(void)
             continue;
         }
 
-        inet_ntop(addr.ss_family, get_in_addr((struct sockaddr *)&addr), s, sizeof s);
+        inet_ntop(addr.ss_family, getInAddr((struct sockaddr *)&addr), s, sizeof s);
         printf("server: got connection from %S\n", s);
         
         request(newfd, cache);

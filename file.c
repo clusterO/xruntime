@@ -3,7 +3,7 @@
 #include <sys/stat.h>
 #include "file.h"
 
-struct data *loadFile(char *filename) 
+struct Data *loadFile(char *filename) 
 {
     char *buffer, *p;
     struct stat buf;
@@ -37,7 +37,7 @@ struct data *loadFile(char *filename)
         totalBytes += readBytes;
     }
 
-    struct data *fileData = malloc(sizeof *fileData);
+    struct Data *fileData = malloc(sizeof *fileData);
 
     if(fileData == NULL) {
         free(buffer);
@@ -50,7 +50,7 @@ struct data *loadFile(char *filename)
     return fileData;
 }
 
-void freeFile(struct data *fileData) 
+void freeFile(struct Data *fileData) 
 {
     free(fileData->data);
     free(fileData);
