@@ -25,9 +25,9 @@ int response(int fd, char *header, char *contentType, void *body, int contentLen
     const int maxResponseSize = 262144;
     char response[maxResponseSize];
 
-    //Implementation
+    int responseLength = sprintf(response, "%\nConnection: close\nContent-Type: %s\nContent-Length: %d\n\n%s", header, contentType, contentLength, body);
     
-    int rv = send(fd, response, maxResponseSize, 0);
+    int rv = send(fd, response, responseLength, 0);
     if(rv < 0) perror("send");
     return rv;
 }
@@ -67,7 +67,13 @@ void request(int fd, struct Cache *cache)
         return;
     }
 
-    //Check method & serve file
+    char method[1024], path[16384];
+    //Implement
+    sscanf(request, "%s %s", method, path);
+    if(strcmp("number", path) == 0) getNumber(fd);
+    else if (strcmp("GET", method) == 0) getFile(fd, cache, path);
+    else if (strcmp("POST", method) == 0) return;
+    else notFound(fd); 
 }
 
 int main(void) 
