@@ -32,7 +32,15 @@ int response(int fd, char *header, char *contentType, void *body, int contentLen
     return rv;
 }
 
-void getNumber(int fd) {}
+void getNumber(int fd) 
+{
+    int number = rand();
+    char numberAsString[1024];
+    int length = sprintf(numberAsString, "%d", number);
+
+    response(fd, "HTTP/1.1 OK", "text/plain", numberAsString, length);
+}
+
 char getFile(int fd, struct Cache *cache, char *path) {}
 char *findBodyStart(char *header) {}
 
