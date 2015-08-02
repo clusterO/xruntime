@@ -41,7 +41,24 @@ void getNumber(int fd)
     response(fd, "HTTP/1.1 OK", "text/plain", numberAsString, length);
 }
 
-char getFile(int fd, struct Cache *cache, char *path) {}
+char getFile(int fd, struct Cache *cache, char *path) 
+{
+    char filePath[4096];
+    struct Data *fileData;
+    char *mimeType;
+
+    snprintf(filePath, sizeof filePath, "%s%s", SERVER_ROOT, path);
+    
+    if(filePath == NULL) {
+        fprinf(stderr, "File not found\n");
+        exit(3);
+    }
+
+    mimeType = getMimeType(filePath);
+    response(fd, "HTTP/1.1 OK", mimeType, fileData->data, fileData->size);
+    free(fileData);
+}
+
 char *findBodyStart(char *header) {}
 
 
