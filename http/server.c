@@ -50,16 +50,23 @@ char getFile(int fd, struct Cache *cache, char *path)
     struct Data *fileData;
     char *mimeType;
 
-    snprintf(filePath, sizeof filePath, "%s%s", SERVER_ROOT, path);
+    if(strcmp(path, "/") == 0) 
+        sprintf(filePath, sizeof filePath, "%s/index.html", SERVER_ROOT);
+    else
+        sprintf(filePath, sizeof filePath, "%s%s", SERVER_ROOT, path);
     
-    if(filePath == NULL) {
-        fprinf(stderr, "File not found\n");
-        exit(3);
+    fileData = loadFilr(filePath);
+
+    if(filePath == NULL)
+        notFount(fd);
+    else {
+        mimeType = getMimeType(filePath);
+        response(fd, "HTTP/1.1 OK", mimeType, fileData->data, fileData->size);
+        free(mimeType);
     }
 
-    mimeType = getMimeType(filePath);
-    response(fd, "HTTP/1.1 OK", mimeType, fileData->data, fileData->size);
-    free(fileData);
+    ffree(fileData);
+    free(filePath);
 }
 
 char *findBodyStart(char *header) {}
