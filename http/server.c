@@ -102,7 +102,7 @@ void request(int fd, struct Cache *cache)
         return;
     }
 
-    char method[1024], path[16384];
+    char method[256], path[16384];
     //Implement
     sscanf(request, "%s %s", method, path);
     

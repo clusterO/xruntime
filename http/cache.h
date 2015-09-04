@@ -18,11 +18,11 @@ struct Cache {
     int size;
 };
 
-extern struct CacheEntry *allocateEntry(char *path, char *content_type, void *content, int content_length);
+extern struct CacheEntry *allocateEntry(char *path, char *contentType, void *content, int contentLength);
 extern void freeEntry(struct CacheEntry *entry);
 extern struct Cache *createCache(int max_size, int hashsize);
 extern void freeCache(struct Cache *cache);
-extern void cput(struct Cache *cache, char *path, char *content_type, void *content, int content_length);
+extern void cput(struct Cache *cache, char *path, char *contentType, void *content, int contentLength);
 extern struct CacheEntry *cget(struct Cache *cache, char *path);
 
 #endif
