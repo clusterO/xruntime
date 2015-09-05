@@ -20,7 +20,7 @@ struct Cache {
 
 extern struct CacheEntry *allocateEntry(char *path, char *contentType, void *content, int contentLength);
 extern void freeEntry(struct CacheEntry *entry);
-extern struct Cache *createCache(int max_size, int hashsize);
+extern struct Cache *createCache(int maxSize, int hashSize);
 extern void freeCache(struct Cache *cache);
 extern void cput(struct Cache *cache, char *path, char *contentType, void *content, int contentLength);
 extern struct CacheEntry *cget(struct Cache *cache, char *path);
