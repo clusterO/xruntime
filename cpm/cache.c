@@ -21,7 +21,7 @@ char pkgCache[BUFSIZE];
 pkgCachePath(pkgCache, author, name, version);
 
 #define GET_JSON_CACHE(author, name, version)
-char jsonCache[BUFSIZE]
+char jsonCache[BUFSIZE];
 char jsonCachePath(jsonCache, author, name, version);
 
 static char pkgCachePath[BUFSIZE];
@@ -79,8 +79,69 @@ int ccCreate(time_t expr)
 
 static int isExpired(char *cache)
 {
-    
+    fs_stats *stat = fs_stat(cache);
+    if(!stat) return -1;
+
+    time_t modified = stat->st_mtime;
+    time_t now = time(NULL);
+    free(stat);
+
+    return now - modified >= cacheExpiration;
 }
+
+int ccConfigExists(char *author, char *name, char *version)
+{
+    GET_JSON_CACHE(author, name, version);
+    return fs_exists(jsonCache) && !isExpired(jsonCache) == 0;
+}
+
+char *ccGetConfig(char *author, char *name, char *version)
+{
+    GET_JSON_CACHE(author, name, version);
+
+    if(isExpired(jsonCache)) return NULL;
+    return fs_read(jsonCache);
+}
+
+int ccSetConfig(char *author, char *name, char *version, char *content)
+{
+    GET_JSON_CACHE(author, name, version);
+    return fs_write(jsonCache, content);
+}
+
+int ccDeleteConfig(char *author, char *name, char *version)
+{
+    GET_JSON_CACHE(author, name, version);
+    return unlink(jsonCache);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
