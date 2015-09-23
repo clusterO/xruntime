@@ -69,8 +69,6 @@ static OPTIONS defaultOpts = {
     .token = 0,
 };
 
-static inline char *stringify(Json *, const char *);
-
 void setPkgOptions(Options opts)
 {
     if(defaultOpts.skipCache == 1 && opts.skipCache == 0)
@@ -112,6 +110,81 @@ void setPkgOptions(Options opts)
     if(defaultOpts.concurrency < 0)
         defaultOpts.concurrency = 0;
 }
+
+static inline char *stringifyObj(Json *obj, const char *key)
+{
+    const char *val = objGetString(obj, key);
+    if(!val) return NULL;
+    return strdup(val);
+}
+
+static inline char *stringifyArr(Json *arr, const char *i)
+{
+    const char *val = arrGetString(arr, i);
+    if(!val) return NULL;
+    return strdup(val);
+}
+
+static inline char buildFileUrl(const char *url, const char *file)
+{
+    if(!url || !file) return NULL;
+
+    int size = strlen(url) + strlen(file) + 2;
+    char *res = malloc(size);
+    
+    if(res) {
+        memset(res, 0, size);
+        sprintf(res, "%s/%s", url, file);    
+    }
+
+    return res;
+}
+
+static inline char *buildSlug(const char *author, const char *name, const char *version)
+{
+    int size = strlen(author) + strlen(name) + strlen(version) + 3;
+    char *slug = malloc(size);
+    
+    if(slug) {
+        memset(slug, '\0', size);
+        sprintf(slug, "%s/%s@%s", author, name, version);
+    }
+
+    return slug;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
