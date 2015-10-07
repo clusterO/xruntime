@@ -197,7 +197,7 @@ static inline char *buildRepo(const char *author, const char *name)
     return repo;
 }
 
-static inline list_t *readDeps(JSON_object *json)
+static inline list_t *parseDependencies(JSON_object *json)
 {
     list_t *list = NULL;
 
@@ -230,6 +230,123 @@ cleanLoop:
 done: 
     return list;
 }
+
+static inline int installPackages(list_t *list, const char *dir, int verbose) 
+{
+    list_node_t *node = NULL;
+    list_iterator_t *iterator = NULL;
+    int rc = -1;
+
+    if(!list || !dir) goto clean;
+
+    iterator = list_iterator_new(list, LIST_HEAD);
+    if(iterator == NULL) goto clean;
+
+    list_t *freeList = list_new();
+
+    while((node = list_iterator_next(iterator))) {
+        Dependency *dep = NULL;
+        char *slug = NULL;
+        Package *pkg = NULL;
+        int error = 1;
+
+        dep = (Dependency *)node->val;
+        slug = buildSlug(dep->author, dep->name, dep->version);
+        if(slug == NULL) goto cleaLoop;
+
+        pkg = newPkgSlug(slug, verbose);
+        if(pkg == NULL) goto cleanLoop;
+
+        if(installPkg(pkg, dir, verbose) == -1) goto cleanLoop;
+
+        list_rpush(freeList, list_node_new(pkg));
+        error = 0;
+
+cleanLoop:
+        if(slug) free(slug);
+        if(error) {
+            list_iterator_destroy(iterator);
+            iterator = NULL;
+            rc = -1;
+            goto clean;
+        }
+    }
+
+    rc = 0;
+
+clean:
+    if(iterator) list_iterator_destroy(iterator);
+    iterator = list_iterator_new(freeList, LIST_HEAD);
+    while((node = list_iterator_new(iterator))) {
+        Package *pkg = node->val;
+        if(pkg) freePkg(pkg);
+    }
+    list_iterator_destroy(iterator);
+    list_destroy(freeList);
+    return rc
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
