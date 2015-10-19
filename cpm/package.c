@@ -13,8 +13,8 @@
 #include "logger.h"
 #include "parson.h"
 
-#ifndef DEFAULT_REPO
-#define DEFAULT_REPO "master"
+#ifndef VERSION
+#define VERSION "master"
 #endif
 
 #ifndef OWNER
@@ -447,7 +447,155 @@ clean:
     return pkg;
 }
 
+static Package newPkgSlug(const char *slug, int versbose, const char *file)
+{
+    char *author = NULL;
+    char *name = NULL;
+    char *version = NULL;
+    char *url = NULL;
+    char *jsonUrl = NULL;
+    char *repo = NULL;
+    char *json = NULL;
+    char *log = NULL;
+    http_get_response_t *res = NULL;
+    package *pkg = NULL;
+    int retries = 3;
 
+    if(!slug) goto error;
+    _debug("Creating package %s", slug);
+    if(!(author = repoOwner(slug, OWNER))) goto error;
+    if(!(name = repoName(slug))) goto error;
+    if(!(version = repoVersion(slug, VERSION))) goto error;
+    if(!(url = pkgUrl(author, name, version))) goto error;
+    if(!(jsonUrl = buildFileUrl(url, file))) goto error;
+
+    _debug("author: %s\nname: %s\nversion: %s\n", author, name, version);
+
+#ifdef PTHREADS_HEADER
+    pthread_mutex_unlock(&lock.mutex);
+#endif
+
+    if(ccConfigExists(author, name, version)) {
+        if(defaultOpts.skipCache) {
+            ccDeleteConfig(author, name, version);
+            goto download;
+        }
+
+        json = ccGetConfig(author, name, version);
+        if(!json) goto download;
+
+        log = "cache";
+
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&lock.mutex);
+#endif
+    } else {
+download:
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&lock.mutex);
+#endif
+        if(retries-- <= 0) goto error;
+        else {
+#ifdef PTHREADS_HEADER
+            initCurlShare();
+            _debug("GET %s", jsonUrl);
+            http_get_free(res);
+            res = http_get_shared(jsonUrl, cpcs);
+#else
+            res = http_get(jsonUrl);
+#endif
+            json = res->data;
+            _debug("status: %d", res->status);
+            if(!res || res->ok) goto download;
+            log = "fetch";
+        }
+    }
+
+    if(verbose) logger_info(log, "%s/%s:%s", author, name, version);
+
+    free(jsonUrl);
+    jsonUrl = NULL;
+    free(name);
+    name = NULL;
+
+    if(json) pkg = newPkg(json, verbose);
+    if(!pkg) goto error;
+
+    if(pkg->version) {
+        if(version) {
+            if(strcmp(version, VERSION) != 0) {
+                _debug("Version number: %s (%s)", version, pkg->version);
+                free(pkg->version);
+                pkg->version = version;
+            } else free(version);
+        }
+    } else pkg->version = version;
+
+    if(author && pkg->author) {
+        if(strcmp(author, pkg->author) != 0) {
+            free(pkg->author);
+            pkg->author = author;
+        } else free(author);
+    } else pkg->author = strdup(author);
+
+    if(!(repo = buildRepo(pkg->author, pkg->name))) goto error;
+
+    if(pkg->repo) {
+        if(strcmp(repo, pkg->repo) != 0) {
+            free(url);
+            if(!(url = pkgRepoUrl(pkg->repo, pkg->version))) goto error;
+        }
+
+        free(repo);
+        repo = NULL;
+    } else pkg->repo = repo;
+
+    pkg->url = url;
+
+#ifdef PTHREADS_HEADER
+    pthread_mutex_lock(&lock.mutex);
+#endif
+
+    if(pkg && pkg->author && pkg->name && pkg->version) {
+        if(ccSetConfig(pkg->author, pkg->name, pkg->version, json) == -1) 
+            _debug("Failed to cache: %s/%s:%s", pkg->author, pkg->name, pkg->version);
+        else
+            _debug("Cached: %s/%s:%s", pkg->author, pkg->name, pkg->version);
+    }
+
+#ifdef PTHREADS_HEADER
+    pthread_mutex_unlock(&lock.mutex);
+#endif
+
+    if(res) {
+        http_get_free(res);
+        json = NULL;
+        res = NULL;
+    } else {
+        free(json);
+        json = NULL;
+    }
+
+    return pkg;
+
+error:
+    if(retries == 0)
+        if(verbose && author && name && file)
+            logger_warn("warning", "Unable to fetch %s/%s:%s", author, name, file);
+
+    free(author);
+    free(name);
+    free(version);
+    free(url);
+    free(jsonUrl);
+    free(repo);
+    
+    if(!res && json) free(json);
+    if(res) http_get_free(res);
+    if(pkg) freePkg(pkg);
+
+    return NULL;
+}
 
 
 
