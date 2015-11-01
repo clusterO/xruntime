@@ -138,14 +138,14 @@ void setPkgOptions(Options opts)
         defaultOpts.concurrency = 0;
 }
 
-static inline char *stringifyObj(JSON_Object *obj, const char *key)
+static inline char *json_object_get_string_safe(JSON_Object *obj, const char *key)
 {
     const char *val = json_object_get_string(obj, key);
     if(!val) return NULL;
     return strdup(val);
 }
 
-static inline char *stringifyArr(JSON_Array *arr, const char *i)
+static inline char *json_array_get_string_safe(JSON_Array *arr, const char *i)
 {
     const char *val = json_array_get_string(arr, i);
     if(!val) return NULL;
@@ -631,7 +631,25 @@ char *pkgUrl(const char *author, const char *name, const char *version)
     return slug;
 }
 
+char *pkgRepoUrl(const char *repo, const char *version) 
+{
+    if(!repo || !version) return NULL;
+    int size = strlen(GITHUB_RAW_CONTENT_URL) + strlen(repo) + strlen(version) + 2;
 
+    if(defaultOpts.token != 0) 
+        size += (strlen(defaultOpts.token) + 1);
+
+    char *slug = malloc(size);
+    if(slug) {
+        memset(slug, '\0', size);
+        if(defaultOpts.token != 0)
+            sprintf(slug, GITHUB_RAW_CONTENT_AUTH_URL "%s/%s", defaultOpts.token, repo, version);
+        else
+            sprintf(slug, GITHUB_RAW_CONTENT_URL, "%s/%s", repo, version);
+    }
+
+    return slug;
+}
 
 
 
