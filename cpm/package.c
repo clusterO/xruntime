@@ -12,6 +12,8 @@
 #include "hash.h"
 #include "logger.h"
 #include "parson.h"
+#include "asprintf.h"
+#include "http-get.h"
 
 #ifndef VERSION
 #define VERSION "master"
@@ -680,6 +682,100 @@ Dependency *newDeps(const char *repo, const char *version)
     _debug("dependency: %s/%s:%s", dep->author, dep->name, dep->version);
     return dep;
 }
+
+static int fetchFile(Package *pkg, const char *dir, char *file, int verbose)
+{
+    char *url = NULL;
+    char *path = NULL;
+    int saved = 0;
+    int rc = 0;
+
+    _debug("Fetch file: %s/%s", pkg->repo, file);
+
+    if(pkg == NULL) return 1;
+    if(pkg->url == NULL) return 1;
+
+    if(strncmp(file, "http", 4))
+        url = strdup(file);
+    else if(!(url = pkgUrl(pkg->url, file)))
+        return 1;
+
+    _debug("File URL: %s", url);
+
+    if(!(path = path_joi,(dir, basename(file)))) {
+        rc =1;
+        goto clean;
+    }
+
+#ifdef PTHREADS_HEADER
+    pthread_mutex_lock(&lock.mutex);
+#endif
+
+    if(defaultOpts.force == 1 || fs_exists(path) == -1) {
+        if(verbose) {
+            logger_info("Fetch", "%s:%s", pkg-repo, file);
+            fflush(stdout);
+        }
+
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&lock.mutex);
+#endif
+        rc = http_get_file_shared(url, path, cpcs);
+        saved = 1;
+    } else {
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&lock.mutex);
+#endif
+    }
+
+    if(rc == -1) {
+        if(verbose) {
+#ifdef PTHREADS_HEADER
+            pthread_mutex_lock(&lock.mutex);
+#endif
+            logger_error("error", "Unable to fetch %s:%s", pkg->repo, file);
+            fflush(stderr);
+            rc = 1;
+#ifdef PTHREADS_HEADER
+            pthread_mutex_unlock(&lock.mutex);
+#endif
+            goto clean;
+        }
+    }
+
+    if(saved) {
+        if(verbose) {
+#ifdef PTHREADS_HEADER
+            pthread_mutex_lock(&lock.mutex);
+#endif
+            logger_info("Save", path);
+            fflush(stdout);
+#ifdef PTHREADS_HEADER
+            pthread_mutex_unlock(&lock.mutex);
+#endif
+        }
+    }
+
+clean:
+    free(url);
+    free(path);
+    return rc;
+}
+
+#ifdef PTHREADS_HEADER
+static void *fetchThreadFile(void *arg) 
+{
+    threadData *data = arg;
+    int *status = malloc(sizeof(int));
+    int rc = fetchFile(data->pkg, data->dir, data->file, data->verbose);
+    *status = rc;
+    (void)data->pkg->refs--;
+    pthread_exit((void *)status);
+    return (void *)rc;
+}
+#endif
+
+
 
 
 
