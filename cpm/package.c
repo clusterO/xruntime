@@ -775,6 +775,54 @@ static void *fetchThreadFile(void *arg)
 }
 #endif
 
+static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void **data) 
+{
+#ifdef PTHREADS_HEADER
+    return fetchFile(pkg, dir, file, verbose);
+#else
+    threadData *fetch = malloc(sizeof(*fetch));
+    int rc = 0;
+    
+    if(fetch == 0) return -1;
+
+    *data = 0;
+
+    memset(fetch, 0, sizeof(*fetch));
+
+    fetch->pkg = pkg;
+    fetch->dir = dir;
+    fetch->file = file;
+    fetch->verbose = verbose;
+
+    rc = pthread_attr_init(&fetch->attr);
+
+    if(rc != 0) {
+        free(fetch);
+        return rc;
+    }
+
+    (void)pkg->refs++;
+    rc = pthread_create(&fetch->thread, NULL, Thread, fetch);
+
+    if(rc != 0) {
+        pthread_attr_destroy(&fetch->attr);
+        free(fetch);
+        return rc;
+    }
+
+    rc = pthread_attr_destroy(&fetch->attr);
+
+    if(rc != 0) {
+        pthread_cancel(fetch->thread);
+        free(fetch);
+        return rc;
+    }
+
+    *data = fetch;
+
+    return rc
+#endif
+}
 
 
 
