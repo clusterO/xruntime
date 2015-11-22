@@ -965,7 +965,319 @@ clean:
     return rc;
 }
 
+int installPkg(Package *pkg, const char *dir, int verbose) 
+{
+    list_iterator_t *iterator = NULL;
+    char *pkgJson = NULL;
+    char *pkgDir = NULL;
+    char *command = NULL;
+    int pending = 0;
+    int rc = 0;
+    int i = 0;
+    long pathMax;
 
+#ifdef PATH_MAX
+    pathMax = PATH_MAX;
+#elif define(_PC_PATH_MAX)
+    pathMax = pathconf(dir, _PC_PATH_MAX);
+#else
+    pathMax = 4096;
+#endif
+
+#ifdef PTHREADS_HEADER
+    int max = defaultOpts.concurrency;
+#endif
+
+#ifdef PACKAGE_PREFIX
+    if(defaultOpts.prefix == 0) {
+#ifdef PTHREADS_HEADER
+        pthread_mutex_lock(&lock.mutex);
+#endif
+        defaultOpts.prefix = PACKAGE_PREFIX;
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&lock.mutex);
+#endif
+    }
+#endif
+
+    if(defaultOpts.prefix == 0) {
+#ifdef PTHREADS_HEADER
+        pthread_mutex_lock(&lock.mutex);
+#endif
+#ifdef _GNU_SOURCE
+        char *prefix = secure_getenv("PREFIX");
+#else
+        char *prefix = getenv("PREFIX");
+#endif
+
+        if(prefix) defaultOpts.prefix = prefix;
+
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&lock.mutex);
+#endif
+    }
+
+    if(visitedPackages == 0) {
+#ifdef PTHREADS_HEADER
+        pthread_mutex_lock(&lock.mutex);
+#endif
+        visitedPackages = hash_new();
+        hash_set(visitedPackages, strdup(""), "");
+
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&lock.mutex);
+#endif
+    }
+
+    if(defaultOpts.force == 0 && pkg && pkg->name) {
+#ifdef PTHREADS_HEADER
+        pthread_mutex_lock(&lock.mutex);
+#endif
+
+        if(hash_has(visitedPackages, pkg->name)) {
+#ifdef PTHREADS_HEADER
+            pthread_mutex_lock(&lock.mutex);
+#endif
+            return 0;
+        }
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&lock.mutex);
+#endif
+    }
+
+#ifdef PTHREADS_HEADER
+    threadData **fetchs = 0;
+    if(pkg != NULL && pkg->src != NULL) 
+        if(pkg->src->len > 0)
+            fetchs = malloc(pkg->src->len * sizeof(threadData));
+
+    if(fetchs) 
+        memset(fetchs, 0, pkg->src->len * sizeof(threadData));
+#endif
+
+    if(!pkg || !dir) {
+        rc = -1;
+        goto clean;
+    } 
+
+    if(!(pkgDir = path_join(dir, pkg->name))) {
+        rc = -1;
+        goto clean;
+    }
+
+    if(!defaultOpts.global) {
+        _debug("mkdir -p %s", pkgDir);
+        if(mkdirp(pkgDir, 0777) == -1) {
+            rc = -1;
+            goto clean;
+        }
+    }
+
+    if(pkg->url == NULL) {
+        pkg->url = pkgUrl(pkg->author, pkg->repoName, pkg->version);
+        if(pkg->url == NULL) {
+            rc = -1;
+            goto clean;
+        }
+    }
+
+    if(!(pkgJson = path_join(pkgDir, pkg->fileName))) {
+        rc = -1;
+        goto clean;
+    }
+
+    if(!defaultOpts.global && pkg->src != NULL) {
+        _debug("write: %s", pkgJson);
+        if(fs_write(pkgJson, pkg->json) == -1) {
+            if(verbose)
+                logger_error("error", "Failed to write %s", pkgJson);
+            rc = -1;
+            goto clean;
+        }
+    }
+
+    if(pkg->name) {
+#ifdef PTHREADS_HEADER
+        pthread_mutex_lock(&lock.mutex);
+#endif
+        if(!hash_has(visitedPackages, pkg->name))
+            hash_set(visitedPackages, strdup(pkg->name), "t");
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&lock.mutex);
+#endif
+    }
+
+    if(!defaultOpts.global && pkg->makefile) {
+        _debug("fetch: %s/%s", pkg->repo, pkg->makefile);
+        void *fetch = 0;
+        rc = fetchPkg(pkg, pkgDir, pkg->makefile, verbose, &fetch);
+        if(rc != 0) goto clean;
+
+#ifdef PTHREADS_HEADER
+        if(fetch != 0) {
+            threadData *data = fetch;
+            int *status;
+            pthread_join(data->thread, (void **)&status);
+            if(status != NULL) {
+                rc = *status;
+                free(status);
+                status = 0;
+                if(rc != 0) {
+                    rc = 0;
+                    logger_warn("warning", "Unable to fetch Makefile (%s) fir '%s'", pkg->makefile, pkg->name);
+                }
+            }
+        }
+#endif
+    }
+
+    if(defaultOpts.global || pkg->src == NULL) goto install;
+
+#ifdef PTHREADS_HEADER
+    pthread_mutex_lock(&lock.mutex);
+#endif
+    
+    if(ccConfigExists(pkg->author, pkg->name, pkg->version)) {
+        if(defaultOpts.skipCache) {
+            ccDeleteConfig(pkg->author, pkg->name, pkg->version);
+#ifdef PTHREADS_HEADER
+            pthread_mutex_unlock(&lock.mutex);
+#endif
+            goto download;
+        }
+
+        if(verbose)
+            logger_info("Cache", pkg->repo);
+
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&lock.mutex);
+#endif
+        goto install;
+    }
+
+#ifdef PTHREADS_HEADER
+    pthread_mutex_unlock(&lock.mutex);
+#endif
+
+download:
+    iterator = list_iterator_new(pkg->src, LIST_HEAD);
+    list_node_t *source;
+
+    while((source = list_iterator_next(iterator))) {
+        void *fetch = NULL;
+        rc = fetchPkg(pkg, pkgDir, source->val, verbose, &fetch);
+        if(rc != 0) {
+            list_iterator_destroy(iterator);
+            iterator = NULL;
+            rc = -1;
+            goto clean;
+        }
+
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+        usleep(1024 * 10);
+#endif
+#ifdef PTHREADS_HEADER
+        if(i < 0) i = 0;
+        fetchs[i] = fetch;
+        pending++;
+
+        if(i < max) i++;
+        else {
+            while(--i >= 0) {
+                threadData *data = fetch[i];
+                int *status;
+                pthread_join(data->thread, (void **)&status);
+                free(data);
+                fetchs[i] = NULL;
+
+                pending--;
+
+                if(NULL != status) {
+                    rc = *status;
+                    free(status);
+                    status = 0;
+                }
+
+                if(rc != 0) {
+                    rc = -1;
+                    goto clean;
+                }
+
+
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+        usleep(1024 * 10);
+#endif
+            }
+        }
+#endif
+    }
+
+#ifdef PTHREADS_HEADER
+    while(--i >= 0) {
+        threadData *data = fetch[i];
+        int *status;
+        pthread_join(data->thread, (void **)&status);
+        pending--;
+        free(data);
+        fetchs[i] = NULL;
+
+        if(status == NULL) {
+            rc = *status;
+            free(status);
+            status = 0;
+        }
+
+        if(rc != 0) {
+            rc = -1;
+            goto clean;
+        }
+    }
+#endif
+#ifdef PTHREADS_HEADER
+    pthread_mutex_lock(&lock.mutex);
+#endif
+    ccSetConfig(pkg->author, pkg->name, pkg->version, pkgDir);
+#ifdef PTHREADS_HEADER
+    pthread_mutex_unlock(&lock.mutex);
+#endif
+
+install:
+    if(pkg->configure) {
+        if(defaultOpts.prefix != NULL && pkg->prefix != NULL) {
+            char path[pathMax];
+            memset(path, 0, pathMax);
+
+            if(defaultOpts.prefix) realpath(defaultOpts.prefix, path);
+            else realpath(prefix->prefix, path);
+
+            _debug("env PREFIX: %s", path);
+            setenv("PREFIX", path, 1);
+        }
+
+        E_FORMAT(&command, "cd %s/%s && %s", dir, pkg->name, pkg->configure);
+        _debug("command(configure): %s", command);
+        rc = system(command);
+        if(rc != 0) goto clean;
+    }
+
+    if(rc == 0 && pkg->install)
+        rc = installExe(pkg, dir, verbose);
+    if(rc == 0)
+        rc = installDeps(pkg, dir, verbose);
+
+clean:
+    if(pkgDir) free(pkgDir);
+    if(pkgJson) free(pkgJson);
+    if(iterator) list_iterator_destroy(iterator);
+    if(command) free(command);
+#ifdef PTHREADS_HEADER
+    if(pkg != NULL && pkg->src != NULL)
+        if(pkg->src->len > 0)
+            if(fetchs) free(fetchs);
+    fetchs = NULL;
+#endif
+    return rc;
+}
 
 
 
