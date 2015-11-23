@@ -1279,6 +1279,13 @@ clean:
     return rc;
 }
 
+int installDeps(Package *pkg, const char *dir, int verbose) 
+{
+    if(!pkg || !dir) return -1;
+    if(pkg->dependencies == NULL) return 0;
+    return installPackages(pkg->dependencies, dir, verbose);
+}
+
 
 
 
