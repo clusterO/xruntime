@@ -1286,6 +1286,13 @@ int installDeps(Package *pkg, const char *dir, int verbose)
     return installPackages(pkg->dependencies, dir, verbose);
 }
 
+int installDev(Package *pkg, const char *dir, int verbose)
+{
+    if(!pkg || !dir) return -1;
+    if(pkg->development == NULL) return 0;
+    return installPackages(pkg->development, dir, verbose);
+}
+
 
 
 
