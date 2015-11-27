@@ -1336,7 +1336,13 @@ void freePkg(Package *pkg)
 }
 
 
-
+void freeDeps(Dependency *dep) 
+{
+    free(dep->name);
+    free(dep->author);
+    free(dep->version);
+    free(dep);
+}
 
 
 
