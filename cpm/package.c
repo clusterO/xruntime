@@ -1293,6 +1293,48 @@ int installDev(Package *pkg, const char *dir, int verbose)
     return installPackages(pkg->development, dir, verbose);
 }
 
+void freePkg(Package *pkg) 
+{
+    if(pkg == NULL) return;
+    if(pkg->refs != 0) return;
+
+#define FREE(k)
+    if(pkg->k) {
+        free(pkg->k);
+        pkg->k = 0;
+    }
+
+    FREE(author);
+    FREE(description);
+    FREE(install);
+    FREE(json);
+    FREE(license);
+    FREE(name);
+    FREE(makefile);
+    FREE(configure);
+    FREE(repo);
+    FREE(repoName);
+    FREE(url);
+    FREE(version);
+    FREE(flags);
+#undef FREE
+
+    if(pkg->src) 
+        list_destroy(pkg->src);
+    pkg->src = 0;
+
+    if(pkg->dependencies)
+        list_destroy(pkg->dependencies);
+    pkg->dependencies = 0;
+
+    if(pkg->development) 
+        list_destroy(pkg->development);
+    pkg->development = 0;
+
+    free(pkg);
+    pkg = 0;
+}
+
 
 
 
