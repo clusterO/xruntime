@@ -7,6 +7,8 @@
 #include "libs/logger.h"
 #include "libs/debug.h"
 #include "libs/commander.h"
+#include "libs/parson.h"
+
 #if defined(_WIN32 || defined(WIN32) || defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__))
 #define setenv(n, v, o) _putenv(n, v)
 #define realpath(p, rp) _fullpath(p, rp, strlen(p))
@@ -49,6 +51,31 @@ static void getInput(char *buffer, size_t s)
     int c = 0;
     while((walk - s) != buffer && (c = fgetc(stdin)) && c != 0) 
         *(walk++) = c;
+}
+
+static void readInput(JSON_Object *root, const char *key, const char *value, const char *output) 
+{
+    static char buffer[512] = {0};
+    memset(buffer, '\0', 512);
+    printf("%s", output);
+    getInput(buffer, 512);
+    char *value = (char *)(strlen(buffer) > 0 ? buffer : value);
+    json_object_set_string(root, key, value);
+}
+
+static inline size_t writeManifest(const char *manifest, const char *str, size_t length)
+{
+    size_t wr = 0;
+    FILE *file = fopen(manifest, "w+");
+    if(!file) {
+        debug(&debugger, "Cannot open %s", manifest);
+        return 0;
+    }
+
+    wr = fwrite(str, sizeof(char), length, file);
+    fclose(file);
+
+    return length - wr;
 }
 
 
