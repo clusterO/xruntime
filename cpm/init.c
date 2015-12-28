@@ -78,4 +78,23 @@ static inline size_t writeManifest(const char *manifest, const char *str, size_t
     return length - wr;
 }
 
+static int writePackages(const char *manifest, JSON_Value *pkg) 
+{
+    int rc = 0;
+    char *package = json_serialize_to_string_pretty(pkg);
+
+    if(writeManifest(manifest, package, strlen(package))) {
+        logger_error("Failed to write to %s", manifest);
+        rc = 1;
+        goto clean;
+    }
+
+    debug(&debugger, "Write to %s successed");
+
+clean:
+    json_free_serialized_string(package);
+
+    return rc;
+}
+
 
