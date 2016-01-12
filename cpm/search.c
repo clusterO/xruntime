@@ -9,8 +9,8 @@
 #include "libs/asprintf.h"
 #include "package.h"
 #include "cache.h"
-#include "http-get.h"
-
+#include "libs/http-get.h"
+#include "libs/console-color.h"
 #define NPM_URL "https://npmjs.com"
 #define SEARCH_CACHE_TIME 86400
 
@@ -55,7 +55,7 @@ static void setJson(command_t *self)
         }   
 }
 
-static int matches(int count, char *args[], wiki *pkg)
+static int matches(int count, char *args[], Wiki *pkg)
 {
     if(count == 0) return 1;
 
@@ -100,6 +100,16 @@ setCache:
     ccSetSeach(html);
     debug(&debugger, "Save cache");
     return html;
+}
+
+static void showPkg(const Wiki *pkg, cc_color_t highlightColor, cc_color_t textColor)
+{
+    cc_fprintf(highlightColor, stdout, " %s\n", pkg->repo);
+    printf("  url: ");
+    cc_fprintf(textColor, stdout, "%s\n", pkg->href);
+    printf("  desc: ");
+    cc_fprintf(textColor, stdout, "%s\n", pkg->description);
+    printf("\n");
 }
 
 
