@@ -11,6 +11,8 @@
 #include "cache.h"
 #include "libs/http-get.h"
 #include "libs/console-color.h"
+#include "libs/parson.h"
+
 #define NPM_URL "https://npmjs.com"
 #define SEARCH_CACHE_TIME 86400
 
@@ -110,6 +112,18 @@ static void showPkg(const Wiki *pkg, cc_color_t highlightColor, cc_color_t textC
     printf("  desc: ");
     cc_fprintf(textColor, stdout, "%s\n", pkg->description);
     printf("\n");
+}
+
+static void addPkgToJson(const Wiki *pkg, JSON_Array *jsonList)
+{
+    JSON_Value *jsonPkgRoot = json_value_init_object();
+    JSON_Object *jsonPkg = json_value_get_object(jsonPkgRoot);
+
+    json_object_set_string(jsonPkg, "repo", pkg->repo);
+    json_object_set_string(jsonPkg, "href", pkg->href); 
+    json_object_set_string(jsonPkg, "description", pkg->description);
+    json_object_set_string(jsonPkg, "category", pkg->category);
+    json_array_append_value(jsonList, jsonPkgRoot);
 }
 
 
