@@ -80,9 +80,9 @@ static void setConcurrency(command_t *self)
 }
 #endif
 
-static int installLocalPkgs(const char *file)
+static int installLocalPkgs()
 {
-    if(fs_exists(file) == -1) {
+    if(fs_exists("manifest.json") == -1) {
         logger_error("error", "Missing config file");
         return 1;
     }
@@ -113,5 +113,64 @@ e1:
     free(json);
     return 1;
 }
+
+static int writeDeps(Package *pkg, char *prefix)
+{
+    const char *file = "manifest.json";
+    JSON_Value *pkgJson = json_parse_file(file);
+    JSON_Object *pkgJsonObj = json_object(pkgJson);
+    JSON_Value *newDep = NULL;
+
+    if(pkgJson == NULL || pkgJsonObj == NULL) return 1;
+
+    JSON_Object *dep = json_object_dotget_object(pkgJsonObj, prefix);
+    if(dep == NULL) {
+        newDep = json_value_init_object();
+        dep = json_value_get_object(newDep);
+        json_object_set_value(pkgJsonObj, prefix, newDep);
+    }
+
+    json_object_set_string(dep, pkg->repo, pkg->version);
+
+    int rc = json_serialize_to_file_pretty(pkgJson, file);
+    json_value_free(pkgJson);
+    return rc;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
