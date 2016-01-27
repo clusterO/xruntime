@@ -206,10 +206,96 @@ clean:
     return rc;
 }
 
+static int installPackages(int n, char **pkg)
+{
+    for(int i = 0; i < n; i++) {
+        debug(&debugger, "install %s (%d)", pkgs[i], i);
+        if(installPkg(pkgs[i]) == -1) return 1;
+    }
 
+    return 0;
+}
 
+int main(int argc, char **argv)
+{
+    long pathMax;
 
+#ifdef _WIN32
+    opts.dir = ".\\deps";
+#else
+    opts.dir = "./deps";
+#endif
+    opts.verbose = 1;
+    opts.dev = 0;
 
+#ifdef PATH_MAX
+    pathMax = PATH_MAX;
+#elif
+    pathMax = pathconf(opts.dir, _PC_PATH_MAX);
+#else
+    pathMax = 4096;
+#endif
+
+    debug_init(&debugger, "update");
+    ccInit(PACKAGE_CACHE_TIME);
+
+    command_t program;
+    command_init(&program, "update");
+    program.usage = "[options] [name <>]";
+    
+    command_option(&program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
+    command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
+    command_option(&program, "-q", "--quiet", "Disable verbose");
+    command_option(&program, "-d", "--dev", "Install development dependencies", setDev);
+    command_option(&program, "-t", "--token <token>", "Set access token", setToken);
+#ifdef
+    command_option(&program, "-C", "--concurrency", "Set concurrency <number>", setConcurrency);
+#endif
+    command_parse(&program, argc, argv);
+
+    debug(&debugger, "%d arguments", program.argc);
+
+    if(curl_global_init(CURL_GLOBAL_ALL) != 0) 
+        logger_error("error", "Failed to init cURL");
+
+    if(opts.prefix) {
+        char prefix[pathMax];
+        memset(prefix, 0, pathMax);
+        realpath(opts.prefix, prefix);
+        unsigned long int size = strlen(prefix) + 1;
+        opts.prefix = malloc(size);
+        memset((void *)opts.prefix, 0, size);
+        memcpy((void *)opts.prefix, prefix, size);
+    }
+
+    ccInit(PACKAGE_CACHE_TIME);
+
+    pkgOpts.skipCache = 1;
+    pkgOpts.prefix = opts.prefix;
+    pkgOpts.global = 0;
+    pkgOpts.force = 1;
+    pkgOpts.token = opts.token;
+
+#ifdef PTHREADS_HEADER
+    pkgOpts.concurrency = opts.concurrency;
+#endif
+
+    setPkgOptions(pkgOpts);
+
+    if(opts.prefix) {
+        setenv("CPM_PREFIX", opts.prefix, 1);
+        setenv("PREFIX", opts.prefix, 1);
+    }
+
+    setenv("FORCE", "1", 1);
+
+    int code = program.argc == 0 ? installLocalPkgs() : installPackages(program.argc, program.argv);
+
+    curl_global_cleanup();
+    cleanPkgs();
+    command_free(program);
+    return code;
+}
 
 
 
