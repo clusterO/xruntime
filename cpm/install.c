@@ -179,6 +179,18 @@ static int writeDeps(Package *pkg, char *prefix)
 }
 
 
+static int saveDeps(Package *pkg)
+{
+    debug(&debugger, "savind dependency %s at %s", pkg->name, pkg->version);
+    return writeDeps(pkg, "dependencies");
+}
+
+static int saveDevDeps(Package *pkg)
+{
+    debug(&debugger, "savind dev dependency %s at %s", pkg->name, pkg->version);
+    return writeDeps(pkg, "develmopent");
+}
+
 
 
 
