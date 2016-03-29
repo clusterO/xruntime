@@ -162,7 +162,232 @@ int buildPackage(const char *dir)
         pkg = newPkgSlug(dir, 0);
 #endif
     }
+
+    if(!pkg) {
+        rc = -ENOMEM;
+        goto clean;
+    }
+
+    if(pkg->makefile != 0) {
+        char *makefile = path_join(dir, pkg->makefile);
+        char *command = 0;
+        char *args = argC > 0 ? str_flatten((const char **)argV, 0, argC) : "";
+        char *clean = 0;
+        char *flags = 0;
+        
+#ifdef _GNU_SOURCE
+        char *cflags = secure_getenv("CFLAGS");
+#else
+        char *cflags = getenv("CFLAGS");
+#endif
+
+        if(cflags)
+            asprintf(&flags, "%s -I %s", cflags, opts.dir);
+        else
+            asprintf(&flags, "-I %s", opts.dir);
+
+        if(rootPkg && rootPkg->prefix) {
+            pkgOpts.prefix = rootPkg->prefix;
+            setPkgOptions(pkgOpts);
+            setenv("PREFIX", pkgOpts.prefix, 1);
+        } else if(opts.prefix) {
+            setenv("PREFIX", opts.prefix, 1);
+        } else if(pkg->prefix) {
+            char prefix[pathMax];
+            memset(prefix, 0, pathMax);
+            realpath(pkg->prefix, prefix);
+            unsigned long int size = strlen(prefix) + 1;
+            free(pkg->prefix);
+            pkg->prefix = malloc(size);
+            memset((void *)pkg->prefix, 0, size);
+            memcpy((void *)pkg->prefix, prefix, size);
+            setenv("PREFIX", pkg->prefix, 1);
+        }
+
+        setenv("CFLAGS", flags, 1);
+
+        if(opts.clean) {
+            char *clean = 0;
+            //Clean cmd
+            asprintf(&clean, "")
+        }
+
+        char *build = 0;
+        if(opts.test)
+            //Build with test cmd
+            asprintf(&build, "");
+        else
+            //Build without test cmd
+            asprintf(&build, "");
+
+        asprintf(&command, "%s && %s %s %s", clean ? clean : ":", build, opts.force ? "-B" : "", args);
+
+        if(opts.verbose)
+            logger_warn("build", "%s: %s", pkg->name, pkg->makefile);
+
+        debug(&debugger, "system: %s", command);
+        rc = system(command);
+        free(command);
+
+        if(clean) free(clean);
+
+        free(makefile);
+        free(build);
+        free(flags);
+
+        if(argC > 0) free(args);
+
+        command = 0;
+#ifdef PTHREADS_HEADER
+        rc = pthread_mutex_lock(&mutex);
+#endif
+
+        hash_set(built, path, "t");
+        ok = 1;
+    } else {
+#ifdef PTHREADS_HEADER
+        rc = pthread_mutex_lock(&mutex);
+#endif
+
+        hash_set(built, path, "f");
+        ok = 1;
+    }
+
+    if(rc != 0) goto clean;
+
+#ifdef PTHREADS_HEADER
+    pthread_mutex_unlock(&mutex);
+#endif
+    if(pkg->dependencies != 0) {
+        list_iterator_t *iterator = 0;
+        list_node_t *node = 0;
+#ifdef PTHREADS_HEADER
+        Thread wraps[opts.concurrency];
+        pthread_t threads[opts.concurrency];
+        unsigned int i = 0;
+#endif
+
+        iterator = list_iterator_new(pkg->dependencies, LIST_HEAD);
+
+        while((node = list_iterator_next(iterator))) {
+            Dependency *dep = node->val;
+            char *slug = 0;
+            char *depDir = 0;
+            asprintf(&slug, "%s/%s@%s", dep->author, dep->name, dep->version);
+            Package *dependency = newPkgSlug(slug, 0);
+
+            if(opts.dir && dependency && dependency->name)
+                depDir = path_join(opts.dir, dependency->name);
+
+            free(slug);
+            freePkg(dependency);
+
+            if(depDir == 0) {
+                rc = -ENOMEM;
+                goto clean;
+            }
+
+#ifdef PTHREADS_HEADER
+            Thread *wrap = &wraps[i];
+            pthread_t *thread = &threads[i];
+            wrap->dir = depDir;
+            rc = pthread_create(thread, 0, buildPackageThread, wrap);
+
+            if(opts.concurrency <= ++i) {
+                for(int j = 0; j < i; ++j) {
+                    pthread_join(threads[j], 0);
+                    free((void *)wraps[j].dir);
+                }
+                i = 0;
+            }
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+            usleep(10240);
+#endif
+#else
+            rc = buildPackage(depDir);
+            free((void *)depDir);
+            if(rc != 0) goto clean;
+#endif
+        }
+#ifdef PTHREADS_HEADER
+        for(int j = 0; j < i; ++j) {
+            pthread_join(threads[j], 0);
+            free((void *)wraps[j].dir);
+        }
+#endif
+        if(iterator != 0)
+            list_iterator_destroy(iterator);
+    }
+
+    if(opts.dev && pkg->development != 0) {
+        list_iterator_t *iterator = 0;
+        list_node_t *node = 0;
+#ifdef PTHREADS_HEADER
+        Thread wraps[opts.concurrency];
+        pthread_t threads[opts.concurrency];
+        unsigned int i = 0;
+#endif
+        iterator = list_iterator_new(pkg->development, LIST_HEAD);
+
+        while((node = list_iterator_next(iterator))) {
+            Dependency *dep = node->val;
+            char *slug = 0;
+            asprintf(&slug, "%s/%s@%s", dep->author, dep->name, dep->version);
+
+            Package *dependency = newPkgSlug(slug, 0);
+            char *depDir = path_join(opts.dir, dependency->name);
+
+            free(slug);
+            freePkg(dependency);
+
+#ifdef PTHREADS_HEADER
+            Thread *wrap = &wraps[i];
+            pthread_t *thread = &threads[i];
+            wrap->dir = depDir;
+            rc = pthread_create(thread, 0, buildPackageThread, wrap);
+
+            if(opts.concurrency <= ++i) {
+                for(int j = 0; j < i; ++j) {
+                    pthread_join(threads[j], 0);
+                    free((void *)wraps[j].dir);
+                }
+                i = 0;
+            }
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+            usleep(10240);
+#endif
+#else
+            if(depDir == 0) {
+                rc = -ENOMEM;
+                goto clean;
+            }
+            rc = buildPackage(depDir);
+            free((void *)depDir);
+
+            if(rc != 0) goto clean;
+#endif
+        }
+#ifdef PTHREADS_HEADER
+        for(int j = 0; j < i; ++j) {
+            pthread_join(threads[j], 0);
+            free((void *)wraps[j].dir);
+        }
+#endif
+        if(iterator != 0)
+            list_iterator_destroy(iterator);
+    } 
+clean:
+    if(pkg != 0)
+        freePkg(pkg);
+    if(json != 0)
+        free(json);
+    if(ok == 0)
+        if(path != 0)
+            free(path);
+    return rc;
 }
+
+
 
 
 
