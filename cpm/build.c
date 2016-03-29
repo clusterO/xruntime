@@ -74,7 +74,7 @@ options opts = {
 #endif
 };
 
-int builPackage(const char *dir);
+int buildPackage(const char *dir);
 
 #ifdef PTHREADS_HEADER
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -87,12 +87,82 @@ void *buildPackageThread(void *arg)
 {
     Thread *wrap = arg;
     const char *dir = wrap->dir;
-    builPackage(dir);
+    buildPackage(dir);
     return 0;
 }
 #endif
 
+int buildPackage(const char *dir)
+{
+    const char *file = "manifest.json"; 
+    Package *pkg = NULL;
+    char *json = NULL;
+    int ok = 0;
+    int rc = 0;
+    long pathMax;
+#ifdef PATH_MAX
+    pathMax = PATH_MAX;
+#elif defined(_PC_PATH_MAX)
+    pathMax = pathconf(dir, _PC_PATH_MAX);
+#else
+    pathMax = 4096;
+#endif
 
+    char *path = path_join(dir, file);
+
+    if(path == 0) return -ENOMEM;
+
+#ifdef PTHREADS_HEADER
+    pthread_mutex_lock(&mutex);
+#endif
+
+    if(!rootPkg) {
+        char *json = fs_read(file);
+        if(json)
+            rootPkg = newPkg(json, opts.verbose);
+
+        if(rootPkg && rootPkg->prefix) {
+            char prefix[pathMax];
+            memset(prefix, 0, pathMax);
+            realpath(rootPkg->prefix, prefix);
+            unsigned long int size = strlen(prefix) + 1;
+            free(rootPkg->prefix);
+            rootPkg->prefix = malloc(size);
+            memset((void *)rootPkg->prefix, 0, size);
+            memcpy((void *)rootPkg->prefix, prefix, size);
+        }
+    }
+
+    if(hash_has(built, path)) {
+#ifdef PTHREADS_HEADER
+        pthread_mutex_unlock(&mutex);
+#endif
+        goto clean;
+    }
+
+#ifdef PTHREADS_HEADER
+    pthread_mutex_unlock(&mutex);
+#endif
+
+    if(fs_exists(path)) {
+        debug(&debugger, "reading %s", path);
+        json = fs_read(path);
+    }
+
+    if(json != 0) {
+#ifdef DEBUG
+        pkg = newPkg(json, 1);
+#else
+        pkg = newPkg(json, 0);
+#endif
+    } else {
+#ifdef DEBUG
+        pkg = newPkgSlug(dir, 1);
+#else
+        pkg = newPkgSlug(dir, 0);
+#endif
+    }
+}
 
 
 
