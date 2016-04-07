@@ -490,6 +490,157 @@ int main(int argc, char **argv)
 #endif
 
     command_parse(&program, argc, argv);
+
+    if(opts.dir) {
+        char dir[pathMax];
+        memset(dir, 0, pathMax);
+        realpath(opts.dir, dir);
+        unsigned long int size = strlen(dir) + 1;
+        opts.dir = malloc(size);
+        memset((void *)opts.dir, 0, size);
+        memcpy((void *)opts.dir, dir, size);
+    }
+
+    if(opts.prefix) {
+        char prefix[pathMax];
+        memset(prefix, 0, pathMax);
+        realpath(opts.prefix, prefix);
+        unsigned long int size = strlen(prefix) + 1;
+        opts.prefix = malloc(size);
+        memset((void *)opts.prefix, 0, size);
+        memcpy((void *)opts.prefix, prefix, size);
+    }
+
+    offset = program.argc;
+
+    if(argc > 0) {
+        int rest = 0;
+        int i = 0;
+        do {
+            char *arg = program.nargv[i];
+            if(arg && arg[0] == '-' && arg[1] == '-' && strlen(arg) == 2) {
+                rest = 1;
+                offset = i + 1;
+            } else if(arg && rest)
+                (void)argC++;
+        } while(program.nargv[++i]);
+    }
+
+    if(argC > 0) {
+        argV = malloc(argC * sizeof(char *));
+        memset(argV, 0, argC * sizeof(char *));
+
+        int j = 0;
+        int i = offset;
+        do {
+            argV[j++] = program.nargv[i++];
+        } while(program.nargv[i]);
+    }
+
+    if(curl_global_init(CURL_GLOBAL_ALL) != 0) {
+        logger_error("error", "Failed to initialize cURL");
+        return 1;
+    }
+
+    ccInit(PACKAGE_CACHE_TIME);
+
+    pkgOpts.skipCache = opts.skipCache;
+    pkgOpts.prefix = opts.prefix;
+    pkgOpts.global = opts.global;
+    pkgOpts.force = opts.force;
+
+    setPkgOptions(pkgOpts);
+
+    if(opts.prefix) {
+        setenv("CPM_PREFIX", opts.prefix, 1);
+        setenv("PREFIX", opts.prefix, 1);
+    }
+
+    if(opts.force) setenv("FORCE", "1", 1);
+
+    if(program.argc || (argc == offset + argC)) 
+        rc = buildPackage(CWD);
+    else {
+        for(int i = 1; i <= offset; ++i) {
+            char *dep = program.nargv[i];
+            if(dep[0] == '.') {
+                char dir[pathMax];
+                memset(dir, 0, pathMax);
+                dep = realpath(dep, dir);
+            } else {
+                fs_stats *stats = fs_stat(dep);
+                if(!stats)
+                    dep = path_join(opts.dir, dep);
+                else
+                    free(stats);
+            }
+
+            fs_stats *stats = fs_stat(dep);
+
+            if(stats && (S_IFREG == (stats->st_mode & S_IFMT)
+#if defined(__unix__) || defined(__linux__) || defined(_POSIX_VERSION)
+                        || S_IFLNK == (stats->st_mode & S_IFMT)
+#endif
+                        )) {
+                dep = basename(dep);
+                rc = buildPackage(dirname(dep));
+            } else {
+                rc = buildPackage(dep);
+
+                if(rc != 0)
+                    rc = buildPackage(program.nargv[i]);
+            }
+            
+            if(stats) {
+                free(stats);
+                stats = 0;
+            }
+        }
+    }
+
+    int totalBuilt = 0;
+    hash_each(built, {
+            if(strncmp("t", val, 1)) 
+                (void)totalBuilt++;
+            if(key != 0)
+                free((void *)key);
+            });
+
+    hash_free(built);
+    command_free(&program);
+    curl_global_cleanup();
+    cleanPkg();
+
+    if(opts.dir) free(opts.dir);
+    if(opts.prefix) free(opts.prefix);
+
+    if(argC > 0) {
+        free(argV);
+        offset = 0;
+        argC = 0;
+        argV = 0;
+    }
+
+    if(rc == 0) {
+        if(totalBuilt > 0)
+            printf("\n");
+
+    if(opts.verbose) {
+        char *context = "";
+        if(opts.clean || opts.test) {
+            context = 0;
+            asprintf(&context, " (%s) ", opts.clean && opts.test ? "clean test" : opts.clean ? "clean" : "test");
+        }
+
+        if(totalBuilt > 1) 
+            logger_info("info", "built %d packages%s", totalBuilt, context);
+
+        if(opts.clean || opts.test)
+            free(context);
+        }
+    }
+
+    return rc;
 }
 
 
