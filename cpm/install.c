@@ -4,8 +4,8 @@
 #include <libgen.h>
 #include <limits.h>
 #include <curl/curl.h>
-#include "cache.h"
-#include "package.h"
+#include "common/cache.h"
+#include "common/package.h"
 #include "libs/commander.h"
 #include "libs/fs.h"
 #include "libs/http-get.h"

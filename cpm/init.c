@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "package.h"
+#include "common/package.h"
 #include "libs/asprintf.h"
 #include "libs/logger.h"
 #include "libs/debug.h"

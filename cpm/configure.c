@@ -17,8 +17,8 @@
 #include "libs/path-join.h"
 #include "libs/str-flatten.h"
 #include "libs/trim.h"
-#include "cache.h"
-#include "package.h"
+#include "common/cache.h"
+#include "common/package.h"
 
 #ifdef _WIN32
 #define getcwd _getcwd
