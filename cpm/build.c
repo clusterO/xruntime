@@ -7,7 +7,6 @@
 #include <limits.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <direct.h>
 #include "common/cache.h"
 #include "common/package.h"
 #include "libs/asprintf.h"
@@ -21,7 +20,12 @@
 #include "libs/str-flatten.h"
 #include "libs/trim.h"
 
+#ifndef VERSION
+#define VERSION "0.1.0"
+#endif
+
 #ifdef _WIN32
+#include <direct.h>
 #define getcwd _getcwd
 #endif
 
@@ -52,14 +56,14 @@ struct options {
 };
 
 Options pkgOpts = {0};
-Package rootPkg = NULL;
+Package *rootPkg = NULL;
 debug_t debugger = {0};
 hash_t *built = 0;
 char **argV = 0;
 int argC = 0;
 int offset = 0;
 
-options opts = {
+struct options opts = {
     .skipCache = 0,
     .verbose = 1,
     .force = 0,
@@ -274,7 +278,7 @@ int buildPackage(const char *dir)
         if(opts.clean) {
             char *clean = 0;
             //Clean cmd
-            asprintf(&clean, "")
+            asprintf(&clean, "");
         }
 
         char *build = 0;
@@ -469,9 +473,10 @@ int main(int argc, char **argv)
     if(getcwd(CWD, pathMax) == 0) return -errno;
 
     built = hash_new();
-    hash_set(built, strdup("build"));
+    hash_set(built, strdup("__build__"), VERSION);
     
-    command_init(&program, "build");
+	command_t program;
+    command_init(&program, "build", VERSION);
     debug_init(&debugger, "build");
 
     program.usage = "[options] [name <>]";
@@ -609,7 +614,7 @@ int main(int argc, char **argv)
     hash_free(built);
     command_free(&program);
     curl_global_cleanup();
-    cleanPkg();
+    cleanPkgs();
 
     if(opts.dir) free(opts.dir);
     if(opts.prefix) free(opts.prefix);
