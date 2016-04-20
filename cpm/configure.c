@@ -19,6 +19,10 @@
 #include "common/cache.h"
 #include "common/package.h"
 
+#ifndef VERSION
+#define VERSION "0.1.0"
+#endif
+
 #ifdef _WIN32
 #include <direct.h>
 #define getcwd _getcwd
@@ -55,6 +59,7 @@ int offset = 0;
 Options pkgOpts = {0};
 Package *rootPkg = NULL;
 debug_t debugger = {0};
+hash_t *configured = 0;
 struct options opts = {
     .skipCache = 0,
     .verbose = 1,
@@ -166,7 +171,7 @@ int configurePackage(const char *dir)
 #endif
 
     if(!rootPkg) {
-        const char *name = "manifest.json"
+        const char *name = "manifest.json";
         const *json = fs_read(name);
         if(json) 
             rootPkg = newPkg(json, opts.verbose);
@@ -248,7 +253,7 @@ int configurePackage(const char *dir)
             free(pkg->prefix);
             pkg->prefix = malloc(size);
             memset((void *)pkg->prefix, 0, size);
-            memcpu((void *)pkg->prefix, prefix, size);
+            memcpy((void *)pkg->prefix, prefix, size);
             setenv("PREFIX", pkg->prefix, 1);
         }
 
@@ -432,10 +437,10 @@ int main(int argc, char **argv)
     if(getcwd(CWD, pathMax) == 0) return -errno;
 
     configured = hash_new();
-    hash_set(configured, "configure");
+    hash_set(configured, "configure", VERSION);
     
     command_t program;
-    command_init(&program, "configure");
+    command_init(&program, "configure", VERSION);
     debug_init(&debugger, "configure");
 
     program.usage = "[options] [name <>]";
@@ -482,7 +487,7 @@ int main(int argc, char **argv)
             if(arg && arg[0] == '-' && arg[1] == '-' && strlen(arg) == 2) {
                 rest = 1;
                 offset = i + 1;
-            } else if(arg & rest)
+            } else if(arg && rest)
                 (void)argC++;
         } while(program.nargv[++i]);
     }
@@ -535,11 +540,10 @@ int main(int argc, char **argv)
                 else
                     free(stats);
             }
-        }
 
         fs_stats *stats = fs_stat(dep);
 
-        if(stats & (S_IFREG == (stats->st_mode & S_IFMT)
+        if(stats && (S_IFREG == (stats->st_mode & S_IFMT)
 #if defined(__unix__) || defined(__linux__) || defined(_POSIX_VERSION)
                     || S_IFLNK == (stats->st_mode & S_IFMT)
 #endif
@@ -557,6 +561,7 @@ int main(int argc, char **argv)
             free(stats);
             stats = 0;
         }
+	  }
     }
 
     int totalConfigured = 0;
