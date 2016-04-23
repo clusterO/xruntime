@@ -10,8 +10,14 @@
 #include "common/package.h"
 #include "common/cache.h"
 #include "libs/http-get.h"
-#include "libs/console-color.h"
+#include "libs/console-colors.h"
 #include "libs/parson.h"
+#include "libs/commander.h"
+#include "libs/wiki-registry.h"
+
+#ifndef VERSION
+#define VERSION "0.1.0"
+#endif
 
 #define NPM_URL "https://npmjs.com"
 #define SEARCH_CACHE_TIME 86400
@@ -27,37 +33,36 @@ static int color;
 static int cache;
 static int json;
 
-static void unsetColor(command_t *self) 
+static void unsetColor() 
 {
     color = 0;
 }
 
-static void unsetCache(command_t *self)
+static void unsetCache()
 {
     cache = 0;
 }
 
-static void setJson(command_t *self)
+static void setJson()
 {
     json = 1;
 }
 
-#define COMPARE(v)
-{
-    if(v == NULL) {
-        rc = 0;
-        goto clean;
-    }
-
-    case_lower(v);
-    for(int i = 0; i < count; i++)
-        if(strstr(v, args[i])) {
-            rc = 1;
-            break
-        }   
+#define COMPARE(v)\
+{\
+    if(v == NULL) {\
+        rc = 0;\
+        goto clean;\
+    }\
+    case_lower(v);\
+    for(int i = 0; i < count; i++)\
+        if(strstr(v, args[i])) {\
+            rc = 1;\
+            break;\
+        }\
 }
 
-static int matches(int count, char *args[], Wiki *pkg)
+static int matches(int count, char *args[], wiki_package_t *pkg)
 {
     if(count == 0) return 1;
 
@@ -67,13 +72,13 @@ static int matches(int count, char *args[], Wiki *pkg)
     char *href = NULL;
     int rc = 0;
 
-    name = pkgName(pkg-repo);
+    name = pkgName(pkg->repo);
     COMPARE(name);
     description = strdup(pkg->description);
     COMPARE(description);
     repo = strcup(pkg->repo);
     COMPARE(repo);
-    href = strdup(pkg->url);
+    href = strdup(pkg->href);
     COMPARE(href);
 
 clean:
@@ -104,7 +109,7 @@ setCache:
     return html;
 }
 
-static void showPkg(const Wiki *pkg, cc_color_t highlightColor, cc_color_t textColor)
+static void showPkg(const wiki_package_t *pkg, cc_color_t highlightColor, cc_color_t textColor)
 {
     cc_fprintf(highlightColor, stdout, " %s\n", pkg->repo);
     printf("  url: ");
@@ -114,7 +119,7 @@ static void showPkg(const Wiki *pkg, cc_color_t highlightColor, cc_color_t textC
     printf("\n");
 }
 
-static void addPkgToJson(const Wiki *pkg, JSON_Array *jsonList)
+static void addPkgToJson(const wiki_package_t *pkg, JSON_Array *jsonList)
 {
     JSON_Value *jsonPkgRoot = json_value_init_object();
     JSON_Object *jsonPkg = json_value_get_object(jsonPkgRoot);
@@ -135,7 +140,7 @@ int main(int argc, char **argv)
     ccInit(SEARCH_CACHE_TIME);
 
     command_t program;
-    command_init(&program, "search");
+    command_init(&program, "search", VERSION);
     program.usage = "[options] [query <>]";
     
     command_option(&program, "-n", "--no-color", "No color", unsetColor);
@@ -143,7 +148,7 @@ int main(int argc, char **argv)
     command_option(&program, "-j", "--json", "Generate JSON output", setJson);
     command_parse(&program, argc, argv);
 
-    for(int i = 0; i < program.argc, i++)
+    for(int i = 0; i < program.argc; i++)
         case_lower(program.argv[i]);
 
     cc_color_t highlightColor = color ? CC_FG_DARK_GREEN : CC_FG_NONE;
@@ -159,9 +164,9 @@ int main(int argc, char **argv)
     list_t *pkgs = wikiParse(html);
     free(html);
 
-    debug(&debugger, "found %zu packages", pkg->len);
+    debug(&debugger, "found %zu packages", pkgs->len);
     
-    list_note_t *node;
+    list_node_t *node;
     list_iterator_t *iterator = list_iterator_new(pkgs, LIST_HEAD);
 
     JSON_Array *jsonList = NULL;
@@ -175,7 +180,7 @@ int main(int argc, char **argv)
     printf("\n");
 
     while((node = list_iterator_next(iterator))) {
-        Wiki *pkg = (Wiki *)node->val;
+        wiki_package_t *pkg = (wiki_package_t *)node->val;
         if(matches(program.argc, program.argv, pkg))
             if(json)
                 addPkgToJson(pkg, jsonList);
