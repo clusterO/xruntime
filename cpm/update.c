@@ -12,6 +12,10 @@
 #include "common/package.h"
 #include "common/cache.h"
 
+#ifndef VERSION
+#define VERSION "0.1.0"
+#endif
+
 #define PACKAGE_CACHE_TIME 2592000
 
 #ifdef PTHREADS_HEADER
@@ -80,9 +84,11 @@ static void setConcurrency(command_t *self)
 }
 #endif
 
-static int installLocalPkgs()
+static int installLocalPackages()
 {
-    if(fs_exists("manifest.json") == -1) {
+	const char *file = "manifest.json";
+	
+    if(fs_exists(file) == -1) {
         logger_error("error", "Missing config file");
         return 1;
     }
@@ -137,7 +143,7 @@ static int writeDeps(Package *pkg, char *prefix)
     return rc;
 }
 
-static int installPkg(const char *slug) 
+static int installPackage(const char *slug) 
 {
     Package *pkg = NULL;
     int rc;
@@ -163,7 +169,7 @@ static int installPkg(const char *slug)
             char dir[pathMax];
             realpath(slug, dir);
             slug = dir;
-            return installLocalPkgs();
+            return installLocalPackages();
         }
 
     if(fs_exists(slug) == 0) {
@@ -174,7 +180,7 @@ static int installPkg(const char *slug)
 #endif
                     )) {
             free(stats);
-            return installLocalPkgs();
+            return installLocalPackages();
         }
 
         if(stats) free(stats);
@@ -206,11 +212,11 @@ clean:
     return rc;
 }
 
-static int installPackages(int n, char **pkg)
+static int installPackages(int n, char **pkgs)
 {
     for(int i = 0; i < n; i++) {
         debug(&debugger, "install %s (%d)", pkgs[i], i);
-        if(installPkg(pkgs[i]) == -1) return 1;
+        if(installPackage(pkgs[i]) == -1) return 1;
     }
 
     return 0;
@@ -240,15 +246,15 @@ int main(int argc, char **argv)
     ccInit(PACKAGE_CACHE_TIME);
 
     command_t program;
-    command_init(&program, "update");
+    command_init(&program, "update", VERSION);
     program.usage = "[options] [name <>]";
     
     command_option(&program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
     command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
-    command_option(&program, "-q", "--quiet", "Disable verbose");
+    command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
     command_option(&program, "-d", "--dev", "Install development dependencies", setDev);
     command_option(&program, "-t", "--token <token>", "Set access token", setToken);
-#ifdef
+#ifdef PTHREADS_HEADER
     command_option(&program, "-C", "--concurrency", "Set concurrency <number>", setConcurrency);
 #endif
     command_parse(&program, argc, argv);
@@ -289,11 +295,11 @@ int main(int argc, char **argv)
 
     setenv("FORCE", "1", 1);
 
-    int code = program.argc == 0 ? installLocalPkgs() : installPackages(program.argc, program.argv);
+    int code = program.argc == 0 ? installLocalPackages() : installPackages(program.argc, program.argv);
 
     curl_global_cleanup();
     cleanPkgs();
-    command_free(program);
+    command_free(&program);
     return code;
 }
 
