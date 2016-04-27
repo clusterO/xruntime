@@ -4,13 +4,18 @@
 #include <limits.h>
 #include <libgen.h>
 #include <curl/curl.h>
-#include <libs/asprintf.h>
-#include "libs/libs.h"
+#include "libs/asprintf.h"
 #include "libs/fs.h"
 #include "libs/http-get.h"
 #include "libs/logger.h"
+#include "libs/debug.h"
+#include "libs/commander.h"
 #include "common/cache.h"
 #include "common/package.h"
+
+#ifndef VERSION
+#define VERSION "0.1.0"
+#endif
 
 #define PACKAGE_CACHE_TIME 2592000
 
@@ -58,13 +63,13 @@ static void setTag(command_t *self)
 
 static void setPrefix(command_t *self)
 {
-    opts.prefix = (char *)self.arg;
+    opts.prefix = (char *)self->arg;
     debug(&debugger, "set prefix: %s", opts.prefix);
 }
 
 static void setToken(command_t *self) 
 {
-    opts.token = (char *)self.arg;
+    opts.token = (char *)self->arg;
     debug(&debugger, "set token: %s", opts.token);
 }
 
@@ -90,7 +95,7 @@ static void setConcurrency(command_t *self)
 }
 #endif
 
-static int installPkg(const char *slug)
+static int installPackage(const char *slug)
 {
     Package *pkg = NULL;
     int rc;
@@ -135,7 +140,7 @@ static int installPkg(const char *slug)
     if(rc != 0) goto clean;
 
     if(pkg->repo == 0 || strcmp(slug, pkg->repo) != 0)
-        pkg->repo strdup(slug);
+        pkg->repo = strdup(slug);
 
 clean:
     if(extendedSlug != 0)
@@ -153,7 +158,7 @@ int main(int argc, char **argv)
     ccInit(PACKAGE_CACHE_TIME);
 
     command_t program;
-    command_init(&program, "upgrade");
+    command_init(&program, "upgrade", VERSION);
     program.usage = "[options] [name <>]";
 
     command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory (default '/usr/local')", setPrefix);
@@ -176,7 +181,7 @@ int main(int argc, char **argv)
         char prefix[pathMax];
         memset(prefix, 0, pathMax);
         realpath(opts.prefix, prefix);
-        unsigned long init size = strlen(prefix) + 1;
+        unsigned long int size = strlen(prefix) + 1;
         opts.prefix = malloc(size);
         memset((void *)opts.prefix, 0, size);
         memcpy((void *)opts.prefix, prefix, size);
@@ -198,7 +203,7 @@ int main(int argc, char **argv)
 
     if(opts.prefix) {
         setenv("CPM_PREFIX", opts.prefix, 1);
-        setenv("PREFIX", opts.prefix, 1)
+        setenv("PREFIX", opts.prefix, 1);
     }
 
     if(opts.force)
@@ -214,7 +219,7 @@ int main(int argc, char **argv)
     else
         slug = opts.slug;
 
-    int code = installPkg(slug);
+    int code = installPackage(slug);
 
     curl_global_cleanup();
     cleanPkgs();
