@@ -7,13 +7,15 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-#include "cache.h"
+#include "../libs/hash.h"
+#include "../libs/logger.h"
+#include "../libs/parson.h"
+#include "../libs/asprintf.h"
+#include "../libs/http-get.h"
+#include "../libs/debug.h"
+#include "../libs/path-join.h"
 #include "package.h"
-#include "hash.h"
-#include "logger.h"
-#include "parson.h"
-#include "asprintf.h"
-#include "http-get.h"
+#include "cache.h"
 
 #ifndef VERSION
 #define VERSION "master"
@@ -33,36 +35,41 @@
 
 static hash_t *visitedPackages = 0;
 
-#ifdef PTHREADS_HEADER
-typedef struct Thread ThreadData;
+typedef struct Thread Thread;
 struct Thread {
     Package *pkg;
-    const char *path;
+    const char *dir;
     char *file;
     int verbose;
     pthread_t thread;
     pthread_attr_t attr;
     void *data;
-}
+};
 
-typedef Lock pkgLock;
+typedef struct Lock Lock;
 struct Lock {
     pthread_mutex_t mutex;
-}
+};
 
-static pkgLock lock = {PTHREAD_MUTEX_INITIALIZER}
-#endif
+static Lock lock = {PTHREAD_MUTEX_INITIALIZER};
 
 CURLSH *cpcs;
 debug_t _debugger;
 
-#define _debug(...)
-({
- rc = asprintf(__VA_ARGS__);
- if(rc == -1) goto cleanup;
- })
+#define _debug(...)\
+({\
+	if(!(_debugger.name))\
+		debug_init(&_debugger, "package");\
+	debug(&_debugger, __VA_ARGS__);\
+})
 
-static OPTIONS defaultOpts = {
+#define E_FORMAT(...)\
+({\
+ rc = asprintf(__VA_ARGS__);\
+ if(rc == -1) goto clean;\
+})
+
+static Options defaultOpts = {
 #ifdef PTHREADS_HEADER
     .concurrency = 4,
 #endif
@@ -103,19 +110,19 @@ void setPkgOptions(Options opts)
     if(defaultOpts.skipCache == 1 && opts.skipCache == 0)
        defaultOpts.skipCache = 0;
     else if (defaultOpts.skipCache == 0 && opts.skipCache == 1)
-       defaultOptions.skipCache = 1;
+       defaultOpts.skipCache = 1;
 
     
     if(defaultOpts.global == 1 && opts.global == 0)
        defaultOpts.global = 0;
     else if (defaultOpts.global == 0 && opts.global == 1)
-       defaultOptions.global = 1;
+       defaultOpts.global = 1;
 
 
     if(defaultOpts.force == 1 && opts.force == 0)
        defaultOpts.force = 0;
     else if (defaultOpts.force == 0 && opts.force == 1)
-       defaultOptions.force = 1;
+       defaultOpts.force = 1;
 
     if(opts.prefix != 0)
         if(strlen(opts.prefix) == 0)
@@ -184,7 +191,7 @@ static inline char *buildSlug(const char *author, const char *name, const char *
 
 Package *loadPkg(const char *manifest, int verbose)
 {
-    Package *pkt = NULL;
+    Package *pkg = NULL;
 
     if(fs_exists(manifest) == -1) {
         logger_error("error", "Missin %s", manifest);
@@ -213,7 +220,7 @@ Package *loadManifest(int verbose)
 
 static inline char *buildRepo(const char *author, const char *name)
 {
-    int size = strlen(author) + strlen(name) = 2;
+    int size = strlen(author) + strlen(name) + 2;
     char *repo = malloc(size);
     
     if(repo) {
@@ -224,7 +231,7 @@ static inline char *buildRepo(const char *author, const char *name)
     return repo;
 }
 
-static inline list_t *parseDependencies(JSON_object *json)
+static inline list_t *parseDependencies(JSON_Object *json)
 {
     list_t *list = NULL;
 
@@ -233,18 +240,18 @@ static inline list_t *parseDependencies(JSON_object *json)
 
     list->free = freeDeps;
 
-    for(int = 0; i < json_object_get_count(obj); i++) {
+    for(int i = 0; i < json_object_get_count(json); i++) {
         const char *name = NULL;
         char *version = NULL;
         Dependency *dep = NULL;
         int error = 1;
 
-        if(!(name = json_object_get_name(obj, i))) goto cleanLoop;
-        if(!(version = json_object_get_string_safe(obj, name))) goto cleanLoop;
+        if(!(name = json_object_get_name(json, i))) goto cleanLoop;
+        if(!(version = json_object_get_string_safe(json, name))) goto cleanLoop;
         if(!(dep = newDeps(name, version))) goto cleanLoop;
         if(!(list_rpush(list, list_node_new(dep)))) goto cleanLoop;
 
-        error 0;
+        error = 0;
 
 cleanLoop:
         if(version) free(version);
@@ -279,7 +286,7 @@ static inline int installPackages(list_t *list, const char *dir, int verbose)
 
         dep = (Dependency *)node->val;
         slug = buildSlug(dep->author, dep->name, dep->version);
-        if(slug == NULL) goto cleaLoop;
+        if(slug == NULL) goto cleanLoop;
 
         pkg = newPkgSlug(slug, verbose);
         if(pkg == NULL) goto cleanLoop;
@@ -304,13 +311,13 @@ cleanLoop:
 clean:
     if(iterator) list_iterator_destroy(iterator);
     iterator = list_iterator_new(freeList, LIST_HEAD);
-    while((node = list_iterator_new(iterator))) {
+    while((node = list_iterator_new(iterator, LIST_HEAD))) {
         Package *pkg = node->val;
         if(pkg) freePkg(pkg);
     }
     list_iterator_destroy(iterator);
     list_destroy(freeList);
-    return rc
+    return rc;
 }
 
 Package *newPkg(const char *json, int verbose) 
@@ -378,7 +385,7 @@ Package *newPkg(const char *json, int verbose)
                     if(asprintf(&pkg->flags, "%s %s", pkg->flags, flag) == -1)
                         goto clean;
     
-                    free(flag)
+                    free(flag);
                 }
             }
         }
@@ -411,7 +418,7 @@ Package *newPkg(const char *json, int verbose)
         if(!(pkg->src = list_new())) goto clean;
         pkg->src->free = free;
         
-        for(int i = 0; i < json_array_get_count(src), i++) {
+        for(int i = 0; i < json_array_get_count(src); i++) {
             char *file = json_array_get_string_safe(src, i);
             _debug("file: %s", file);
             if(!file) goto clean;
@@ -449,7 +456,7 @@ clean:
     return pkg;
 }
 
-static Package pkgSlug(const char *slug, int versbose, const char *file)
+static Package *pkgSlug(const char *slug, int verbose, const char *file)
 {
     char *author = NULL;
     char *name = NULL;
@@ -460,7 +467,7 @@ static Package pkgSlug(const char *slug, int versbose, const char *file)
     char *json = NULL;
     char *log = NULL;
     http_get_response_t *res = NULL;
-    package *pkg = NULL;
+    Package *pkg = NULL;
     int retries = 3;
 
     if(!slug) goto error;
@@ -599,15 +606,15 @@ error:
     return NULL;
 }
 
-Package newPkgSlug(const char *slug, int verbose) 
+Package *newPkgSlug(const char *slug, int verbose) 
 {
     Package *pkg = NULL;
-    const char *name = "package.json"
+    const char *name = "package.json";
     unsigned int i = 0;
     
     pkg = pkgSlug(slug, verbose, name);
     if(pkg != NULL)
-        pkg->fileName = (char *)name;
+        pkg->filename = (char *)name;
 
     return pkg;
 }
@@ -697,12 +704,12 @@ static int fetchFile(Package *pkg, const char *dir, char *file, int verbose)
 
     if(strncmp(file, "http", 4))
         url = strdup(file);
-    else if(!(url = pkgUrl(pkg->url, file)))
+    else if(!(url = buildFileUrl(pkg->url, file)))
         return 1;
 
     _debug("File URL: %s", url);
 
-    if(!(path = path_joi,(dir, basename(file)))) {
+    if(!(path = path_join,(dir, basename(file)))) {
         rc =1;
         goto clean;
     }
@@ -713,7 +720,7 @@ static int fetchFile(Package *pkg, const char *dir, char *file, int verbose)
 
     if(defaultOpts.force == 1 || fs_exists(path) == -1) {
         if(verbose) {
-            logger_info("Fetch", "%s:%s", pkg-repo, file);
+            logger_info("Fetch", "%s:%s", pkg->repo, file);
             fflush(stdout);
         }
 
@@ -762,10 +769,9 @@ clean:
     return rc;
 }
 
-#ifdef PTHREADS_HEADER
 static void *fetchThreadFile(void *arg) 
 {
-    ThreadData *data = arg;
+    Thread *data = arg;
     int *status = malloc(sizeof(int));
     int rc = fetchFile(data->pkg, data->dir, data->file, data->verbose);
     *status = rc;
@@ -773,14 +779,13 @@ static void *fetchThreadFile(void *arg)
     pthread_exit((void *)status);
     return (void *)rc;
 }
-#endif
 
 static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void **data) 
 {
 #ifdef PTHREADS_HEADER
     return fetchFile(pkg, dir, file, verbose);
 #else
-    ThreadData *fetch = malloc(sizeof(*fetch));
+    Thread *fetch = malloc(sizeof(*fetch));
     int rc = 0;
     
     if(fetch == 0) return -1;
@@ -802,7 +807,7 @@ static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void
     }
 
     (void)pkg->refs++;
-    rc = pthread_create(&fetch->thread, NULL, Thread, fetch);
+    rc = pthread_create(&fetch->thread, NULL, fetchThreadFile, fetch);
 
     if(rc != 0) {
         pthread_attr_destroy(&fetch->attr);
@@ -820,7 +825,7 @@ static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void
 
     *data = fetch;
 
-    return rc
+    return rc;
 #endif
 }
 
@@ -872,7 +877,7 @@ int installExe(Package *pkg, char *dir, int verbose)
     }
 
     E_FORMAT(&url, "https://github.com/%s/archive/%s.tar.gz", pkg->repo, pkg->version);
-    E_FORMAT($file, "%s-%s.tar.gz", reponame, pkg->version);
+    E_FORMAT(&file, "%s-%s.tar.gz", reponame, pkg->version);
     E_FORMAT(&tarball, "%s/%s", tmp, file);
 
     rc = http_get_file_shared(url, tarball, cpcs);
@@ -1046,13 +1051,13 @@ int installPkg(Package *pkg, const char *dir, int verbose)
     }
 
 #ifdef PTHREADS_HEADER
-    ThreadData **fetchs = 0;
+    Thread **fetchs = 0;
     if(pkg != NULL && pkg->src != NULL) 
         if(pkg->src->len > 0)
-            fetchs = malloc(pkg->src->len * sizeof(ThreadData));
+            fetchs = malloc(pkg->src->len * sizeof(Thread));
 
     if(fetchs) 
-        memset(fetchs, 0, pkg->src->len * sizeof(ThreadData));
+        memset(fetchs, 0, pkg->src->len * sizeof(Thread));
 #endif
 
     if(!pkg || !dir) {
@@ -1081,7 +1086,7 @@ int installPkg(Package *pkg, const char *dir, int verbose)
         }
     }
 
-    if(!(pkgJson = path_join(pkgDir, pkg->fileName))) {
+    if(!(pkgJson = path_join(pkgDir, pkg->filename))) {
         rc = -1;
         goto clean;
     }
@@ -1115,7 +1120,7 @@ int installPkg(Package *pkg, const char *dir, int verbose)
 
 #ifdef PTHREADS_HEADER
         if(fetch != 0) {
-            ThreadData *data = fetch;
+            Thread *data = fetch;
             int *status;
             pthread_join(data->thread, (void **)&status);
             if(status != NULL) {
@@ -1184,7 +1189,7 @@ download:
         if(i < max) i++;
         else {
             while(--i >= 0) {
-                ThreadData *data = fetch[i];
+                Thread *data = fetch[i];
                 int *status;
                 pthread_join(data->thread, (void **)&status);
                 free(data);
@@ -1214,7 +1219,7 @@ download:
 
 #ifdef PTHREADS_HEADER
     while(--i >= 0) {
-        ThreadData *data = fetch[i];
+        Thread *data = fetch[i];
         int *status;
         pthread_join(data->thread, (void **)&status);
         pending--;
@@ -1248,7 +1253,7 @@ install:
             memset(path, 0, pathMax);
 
             if(defaultOpts.prefix) realpath(defaultOpts.prefix, path);
-            else realpath(prefix->prefix, path);
+            else realpath(pkg->prefix, path);
 
             _debug("env PREFIX: %s", path);
             setenv("PREFIX", path, 1);
@@ -1298,10 +1303,10 @@ void freePkg(Package *pkg)
     if(pkg == NULL) return;
     if(pkg->refs != 0) return;
 
-#define FREE(k)
-    if(pkg->k) {
-        free(pkg->k);
-        pkg->k = 0;
+#define FREE(k)\
+    if(pkg->k) {\
+        free(pkg->k);\
+        pkg->k = 0;\
     }
 
     FREE(author);
