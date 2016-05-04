@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include "fs/fs.h"
-#include "tinydir/tinydir.h"
+#include "fs.h"
+#include "tinydir.h"
 #include "copy.h"
 
 

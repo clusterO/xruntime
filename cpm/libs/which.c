@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include "strdup/strdup.h"
+#include "strdup.h"
 #include "which.h"
 
 // delimiter

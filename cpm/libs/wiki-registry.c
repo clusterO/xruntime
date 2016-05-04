@@ -13,12 +13,12 @@
 #include "gumbo-text-content/gumbo-text-content.h"
 #include "gumbo-get-element-by-id/get-element-by-id.h"
 #include "gumbo-get-elements-by-tag-name/get-elements-by-tag-name.h"
-#include "http-get/http-get.h"
-#include "list/list.h"
-#include "substr/substr.h"
-#include "strdup/strdup.h"
-#include "case/case.h"
-#include "trim/trim.h"
+#include "http-get.h"
+#include "list.h"
+#include "substr.h"
+#include "strdup.h"
+#include "case.h"
+#include "trim.h"
 #include "wiki-registry.h"
 
 //

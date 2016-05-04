@@ -8,9 +8,9 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include "strdup/strdup.h"
-#include "str-ends-with/str-ends-with.h"
-#include "str-starts-with/str-starts-with.h"
+#include "strdup.h"
+#include "str-ends-with.h"
+#include "str-starts-with.h"
 #include "path-join.h"
 
 #ifdef _WIN32
