@@ -148,11 +148,11 @@ static int installLocalpkgs()
     }
 
     free(json);
-    freePkgs(pkg);
+    freePkg(pkg);
     return 0;
 
 e2:
-    freePkgs(pkg);
+    freePkg(pkg);
 e1:
     free(json);
     return 1;

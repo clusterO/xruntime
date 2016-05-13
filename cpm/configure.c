@@ -1,4 +1,3 @@
-#include <curl/curl.h>
 #include <errno.h>
 #include <libgen.h>
 #include <limits.h>
@@ -18,6 +17,7 @@
 #include "libs/trim.h"
 #include "common/cache.h"
 #include "common/package.h"
+#include <curl/curl.h>
 
 #ifndef VERSION
 #define VERSION "0.1.0"

@@ -11,7 +11,7 @@
 #include "str-flatten.h"
 
 char *
-str_flatten(const char *array[], int start, int end) {
+str_flatten(char *array[], int start, int end) {
   int count = end - start;
   size_t lengths[count];
   size_t size = 0;
