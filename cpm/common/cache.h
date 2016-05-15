@@ -1,6 +1,8 @@
 #ifndef CPM_CACHE_HEADER
 #define CPM_CACHE_HEADER
 
+#include <time.h>
+
 extern int ccCreate(time_t);
 extern int ccInit();
 extern const char *ccMetaPath();
@@ -14,7 +16,7 @@ extern char *ccGetSearch();
 extern int ccSetSearch(char *);
 extern int ccDeleteSearch();
 extern int ccPackageExists(char *, char *, char *);
-extern int ccPackageExpired(char *, char *, char * );
+extern int ccPackageExpired(char *, char *, char *);
 extern int ccLoadPackage(char *, char *, char *, char *);
 extern int ccSetPackage(char *, char *, char *, char *);
 extern int ccDeletePackage(char *, char *, char *);

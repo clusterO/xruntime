@@ -20,31 +20,33 @@
 
 debug_t debugger;
 
-struct Options {
+struct Options
+{
     char *manifest;
     int verbose;
 };
 
 static struct Options opts;
 
-static void setOpts(command_t *cmd) 
+static void setOpts(command_t *cmd)
 {
     opts.verbose = 0;
     debug(&debugger, "set quiet flag");
 }
 
-static void setManifestOpts(command_t *cmd) 
+static void setManifestOpts(command_t *cmd)
 {
     opts.manifest = (char *)cmd->arg;
     debug(&debugger, "set manifest: %s", opts.manifest);
 }
 
-static char *basePath() 
+static char *basePath()
 {
     char cwd[4096] = {0};
     getcwd(cwd, 4096);
     char *walk = cwd + strlen(cwd);
-    while(*(--walk) != '/');
+    while (*(--walk) != '/')
+        ;
     char *basepath = malloc((size_t)(walk - cwd));
     return basepath;
 }
@@ -53,11 +55,11 @@ static void getInput(char *buffer, size_t s)
 {
     char *walk = buffer;
     int c = 0;
-    while((walk - s) != buffer && (c = fgetc(stdin)) && c != 0) 
+    while ((walk - s) != buffer && (c = fgetc(stdin)) && c != 0)
         *(walk++) = c;
 }
 
-static void readInput(JSON_Object *root, const char *key, const char *defaultValue, const char *output) 
+static void readInput(JSON_Object *root, const char *key, const char *defaultValue, const char *output)
 {
     static char buffer[512] = {0};
     memset(buffer, '\0', 512);
@@ -71,7 +73,8 @@ static inline size_t writeManifest(const char *manifest, const char *str, size_t
 {
     size_t wr = 0;
     FILE *file = fopen(manifest, "w+");
-    if(!file) {
+    if (!file)
+    {
         debug(&debugger, "Cannot open %s", manifest);
         return 0;
     }
@@ -82,12 +85,13 @@ static inline size_t writeManifest(const char *manifest, const char *str, size_t
     return length - wr;
 }
 
-static int writePackages(const char *manifest, JSON_Value *pkg) 
+static int writePackages(const char *manifest, JSON_Value *pkg)
 {
     int rc = 0;
     char *package = json_serialize_to_string_pretty(pkg);
 
-    if(writeManifest(manifest, package, strlen(package))) {
+    if (writeManifest(manifest, package, strlen(package)))
+    {
         logger_error("Failed to write to %s", manifest);
         rc = 1;
         goto clean;
@@ -101,7 +105,7 @@ clean:
     return rc;
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
     int exit = 0;
     opts.verbose = 1;
@@ -111,8 +115,8 @@ int main(int argc, char **argv)
     command_t program;
     command_init(&program, "init", VERSION);
     program.usage = "[options]";
-    program_options(&program, "-q", "--quiet", "disable verbose", setOpts);
-    command_options(&program, "-M", "--manifest <filename>", "name your manifest file. (default manifest.json)", setManifestOpts);
+    command_option(&program, "-q", "--quiet", "disable verbose", setOpts);
+    command_option(&program, "-M", "--manifest <filename>", "name your manifest file. (default manifest.json)", setManifestOpts);
     command_parse(&program, argc, argv);
 
     debug(&debugger, "%d arguments", program.argc);
@@ -124,7 +128,8 @@ int main(int argc, char **argv)
     char *pkgName = NULL;
 
     int rc = asprintf(&pkgName, "package name (%s): ", basepath);
-    if(rc == -1) {
+    if (rc == -1)
+    {
         logger_error("error", "asprintf() out of memory");
         goto finish;
     }

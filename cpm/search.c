@@ -33,7 +33,7 @@ static int color;
 static int cache;
 static int json;
 
-static void unsetColor() 
+static void unsetColor()
 {
     color = 0;
 }
@@ -48,23 +48,26 @@ static void setJson()
     json = 1;
 }
 
-#define COMPARE(v)\
-{\
-    if(v == NULL) {\
-        rc = 0;\
-        goto clean;\
-    }\
-    case_lower(v);\
-    for(int i = 0; i < count; i++)\
-        if(strstr(v, args[i])) {\
-            rc = 1;\
-            break;\
-        }\
-}
+#define COMPARE(v)                      \
+    {                                   \
+        if (v == NULL)                  \
+        {                               \
+            rc = 0;                     \
+            goto clean;                 \
+        }                               \
+        case_lower(v);                  \
+        for (int i = 0; i < count; i++) \
+            if (strstr(v, args[i]))     \
+            {                           \
+                rc = 1;                 \
+                break;                  \
+            }                           \
+    }
 
 static int matches(int count, char *args[], wiki_package_t *pkg)
 {
-    if(count == 0) return 1;
+    if (count == 0)
+        return 1;
 
     char *description = NULL;
     char *name = NULL;
@@ -76,7 +79,7 @@ static int matches(int count, char *args[], wiki_package_t *pkg)
     COMPARE(name);
     description = strdup(pkg->description);
     COMPARE(description);
-    repo = strcup(pkg->repo);
+    repo = strdup(pkg->repo);
     COMPARE(repo);
     href = strdup(pkg->href);
     COMPARE(href);
@@ -87,24 +90,28 @@ clean:
     return rc;
 }
 
-static char *cacheSearch() 
+static char *cacheSearch()
 {
-    if(ccSearchExists() && cache) {
-        char *data = ccGetsearach();
-        if(data) return data;
+    if (ccSearchExists() && cache)
+    {
+        char *data = ccGetSearch();
+        if (data)
+            return data;
         goto setCache;
     }
 
 setCache:
     debug(&debugger, "Setting cache from %s", NPM_URL);
     http_get_response_t *res = http_get(NPM_URL);
-    if(!res->ok) return NULL;
+    if (!res->ok)
+        return NULL;
 
     char *html = strdup(res->data);
-    if(html == NULL) return NULL;
+    if (html == NULL)
+        return NULL;
     http_get_free(res);
 
-    ccSetSeach(html);
+    ccSetSearch(html);
     debug(&debugger, "Save cache");
     return html;
 }
@@ -125,7 +132,7 @@ static void addPkgToJson(const wiki_package_t *pkg, JSON_Array *jsonList)
     JSON_Object *jsonPkg = json_value_get_object(jsonPkgRoot);
 
     json_object_set_string(jsonPkg, "repo", pkg->repo);
-    json_object_set_string(jsonPkg, "href", pkg->href); 
+    json_object_set_string(jsonPkg, "href", pkg->href);
     json_object_set_string(jsonPkg, "description", pkg->description);
     json_object_set_string(jsonPkg, "category", pkg->category);
     json_array_append_value(jsonList, jsonPkgRoot);
@@ -136,63 +143,67 @@ int main(int argc, char **argv)
     color = 1;
     cache = 1;
 
-    debut_init(&debugger, "search");
+    debug_init(&debugger, "search");
     ccInit(SEARCH_CACHE_TIME);
 
     command_t program;
     command_init(&program, "search", VERSION);
     program.usage = "[options] [query <>]";
-    
+
     command_option(&program, "-n", "--no-color", "No color", unsetColor);
     command_option(&program, "-c", "--skip-cache", "Skipt cache search", unsetCache);
     command_option(&program, "-j", "--json", "Generate JSON output", setJson);
     command_parse(&program, argc, argv);
 
-    for(int i = 0; i < program.argc; i++)
+    for (int i = 0; i < program.argc; i++)
         case_lower(program.argv[i]);
 
     cc_color_t highlightColor = color ? CC_FG_DARK_GREEN : CC_FG_NONE;
     cc_color_t textColor = color ? CC_FG_GRAY : CC_FG_NONE;
 
     char *html = cacheSearch();
-    if(html == NULL) {
+    if (html == NULL)
+    {
         command_free(&program);
         logger_error("error", "Failed to fetch HTML");
         return 1;
     }
 
-    list_t *pkgs = wikiParse(html);
+    list_t *pkgs = wiki_registry_parse(html);
     free(html);
 
     debug(&debugger, "found %zu packages", pkgs->len);
-    
+
     list_node_t *node;
     list_iterator_t *iterator = list_iterator_new(pkgs, LIST_HEAD);
 
     JSON_Array *jsonList = NULL;
     JSON_Value *jsonListRoot = NULL;
 
-    if(json) {
+    if (json)
+    {
         jsonListRoot = json_value_init_array();
         jsonList = json_value_get_array(jsonListRoot);
     }
 
     printf("\n");
 
-    while((node = list_iterator_next(iterator))) {
+    while ((node = list_iterator_next(iterator)))
+    {
         wiki_package_t *pkg = (wiki_package_t *)node->val;
-        if(matches(program.argc, program.argv, pkg))
-            if(json)
+        if (matches(program.argc, program.argv, pkg))
+            if (json)
                 addPkgToJson(pkg, jsonList);
             else
                 showPkg(pkg, highlightColor, textColor);
         else
             debug(&debugger, "skipped package %s", pkg->repo);
 
-        wikiFree(pkg);
+        wiki_package_free(pkg);
     }
 
-    if(json) {
+    if (json)
+    {
         char *serialized = json_serialize_to_string_pretty(jsonListRoot);
         puts(serialized);
         json_free_serialized_string(serialized);
@@ -204,37 +215,3 @@ int main(int argc, char **argv)
     command_free(&program);
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

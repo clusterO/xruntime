@@ -1,16 +1,18 @@
 #ifndef CPM_PACKAGE_HEADER
 #define CPM_PACKAGE_HEADER
 
-#include "../libs/list.h"
 #include <curl/curl.h>
+#include "../libs/list.h"
 
-typedef struct {
+typedef struct
+{
     char *name;
     char *author;
     char *version;
 } Dependency;
 
-typedef struct {
+typedef struct
+{
     char *name;
     char *author;
     char *description;
@@ -33,7 +35,8 @@ typedef struct {
     unsigned int refs;
 } Package;
 
-typedef struct {
+typedef struct
+{
     int skipCache;
     int force;
     int global;
@@ -42,13 +45,13 @@ typedef struct {
     char *token;
 } Options;
 
-extern CURLSH *cpcs;
+CURLSH *cpcs;
 extern void setPkgOptions(Options);
 extern Package *newPkg(const char *, int);
-extern Package *newPkgSlug(const char*, int);
-extern Package *loadPkg(const char*, int);
+extern Package *newPkgSlug(const char *, int);
+extern Package *loadPkg(const char *, int);
 extern Package *loadManifest(int);
-extern char *pkgUrl(const char *, const char *, const char*);
+extern char *pkgUrl(const char *, const char *, const char *);
 extern char *pkgRepoUrl(const char *repo, const char *version);
 extern char *pkgVersion(const char *);
 extern char *pkgAuthor(const char *);
@@ -63,36 +66,3 @@ extern void freeDeps(Dependency *);
 extern void cleanPkgs();
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

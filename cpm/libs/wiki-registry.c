@@ -9,10 +9,10 @@
 #include <curl/curl.h>
 #include <string.h>
 #include <stdlib.h>
-#include "gumbo-parser/gumbo.h"
-#include "gumbo-parser/gumbo-text-content.h"
-#include "gumbo-parser/get-element-by-id.h"
-#include "gumbo-parser/get-elements-by-tag-name.h"
+#include "../gumbo-parser/gumbo.h"
+#include "../gumbo-parser/gumbo-text-content.h"
+#include "../gumbo-parser/get-element-by-id.h"
+#include "../gumbo-parser/get-elements-by-tag-name.h"
 #include "http-get.h"
 #include "list.h"
 #include "substr.h"

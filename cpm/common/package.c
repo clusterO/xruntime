@@ -1,3 +1,6 @@
+#include "package.h"
+#include "cache.h"
+
 #include <curl/curl.h>
 #include <libgen.h>
 #include <limits.h>
@@ -7,6 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+
 #include "../libs/hash.h"
 #include "../libs/logger.h"
 #include "../libs/parson.h"
@@ -14,8 +18,8 @@
 #include "../libs/http-get.h"
 #include "../libs/debug.h"
 #include "../libs/path-join.h"
-#include "package.h"
-#include "cache.h"
+#include "../libs/parse-repo.h"
+#include "../libs/tempdir.h"
 
 #ifndef VERSION
 #define VERSION "master"
@@ -36,7 +40,8 @@
 static hash_t *visitedPackages = 0;
 
 typedef struct Thread Thread;
-struct Thread {
+struct Thread
+{
     Package *pkg;
     const char *dir;
     char *file;
@@ -47,7 +52,8 @@ struct Thread {
 };
 
 typedef struct Lock Lock;
-struct Lock {
+struct Lock
+{
     pthread_mutex_t mutex;
 };
 
@@ -56,18 +62,19 @@ static Lock lock = {PTHREAD_MUTEX_INITIALIZER};
 CURLSH *cpcs;
 debug_t _debugger;
 
-#define _debug(...)\
-({\
-	if(!(_debugger.name))\
-		debug_init(&_debugger, "package");\
-	debug(&_debugger, __VA_ARGS__);\
-})
+#define _debug(...)                            \
+    ({                                         \
+        if (!(_debugger.name))                 \
+            debug_init(&_debugger, "package"); \
+        debug(&_debugger, __VA_ARGS__);        \
+    })
 
-#define E_FORMAT(...)\
-({\
- rc = asprintf(__VA_ARGS__);\
- if(rc == -1) goto clean;\
-})
+#define E_FORMAT(...)               \
+    ({                              \
+        rc = asprintf(__VA_ARGS__); \
+        if (rc == -1)               \
+            goto clean;             \
+    })
 
 static Options defaultOpts = {
 #ifdef PTHREADS_HEADER
@@ -81,7 +88,7 @@ static Options defaultOpts = {
 };
 
 #ifdef PTHREADS_HEADER
-static void curlLock(CURL *handle, curl_lock_data data, curl_lock_access access, void *userptr) 
+static void curlLock(CURL *handle, curl_lock_data data, curl_lock_access access, void *userptr)
 {
     pthread_mutex_lock(&lock.mutex);
 }
@@ -91,9 +98,10 @@ static void curlUnlock(CURL *handle, curl_lock_data data, curl_lock_access acces
     pthread_mutex_unlock(&lock_mutex);
 }
 
-static void intCurlShare() 
+static void intCurlShare()
 {
-    if(cpcs == 0) {
+    if (cpcs == 0)
+    {
         pthread_mutex_lock(&lock.mutex);
         cpcs = curl_share_init();
         curl_share_setopt(cpcs, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
@@ -107,70 +115,70 @@ static void intCurlShare()
 
 void setPkgOptions(Options opts)
 {
-    if(defaultOpts.skipCache == 1 && opts.skipCache == 0)
-       defaultOpts.skipCache = 0;
+    if (defaultOpts.skipCache == 1 && opts.skipCache == 0)
+        defaultOpts.skipCache = 0;
     else if (defaultOpts.skipCache == 0 && opts.skipCache == 1)
-       defaultOpts.skipCache = 1;
+        defaultOpts.skipCache = 1;
 
-    
-    if(defaultOpts.global == 1 && opts.global == 0)
-       defaultOpts.global = 0;
+    if (defaultOpts.global == 1 && opts.global == 0)
+        defaultOpts.global = 0;
     else if (defaultOpts.global == 0 && opts.global == 1)
-       defaultOpts.global = 1;
+        defaultOpts.global = 1;
 
-
-    if(defaultOpts.force == 1 && opts.force == 0)
-       defaultOpts.force = 0;
+    if (defaultOpts.force == 1 && opts.force == 0)
+        defaultOpts.force = 0;
     else if (defaultOpts.force == 0 && opts.force == 1)
-       defaultOpts.force = 1;
+        defaultOpts.force = 1;
 
-    if(opts.prefix != 0)
-        if(strlen(opts.prefix) == 0)
+    if (opts.prefix != 0)
+        if (strlen(opts.prefix) == 0)
             defaultOpts.prefix = 0;
         else
             defaultOpts.prefix = 1;
 
-
-    if(opts.token != 0)
-        if(strlen(opts.token) == 0)
+    if (opts.token != 0)
+        if (strlen(opts.token) == 0)
             defaultOpts.token = 0;
         else
             defaultOpts.token = 1;
 
-
-    if(opts.concurrency)
+    if (opts.concurrency)
         defaultOpts.concurrency = opts.concurrency;
-    else if(opts.concurrency < 0)
+    else if (opts.concurrency < 0)
         defaultOpts.concurrency = 0;
 
-    if(defaultOpts.concurrency < 0)
+    if (defaultOpts.concurrency < 0)
         defaultOpts.concurrency = 0;
 }
 
 static inline char *json_object_get_string_safe(JSON_Object *obj, const char *key)
 {
     const char *val = json_object_get_string(obj, key);
-    if(!val) return NULL;
+    if (!val)
+        return NULL;
     return strdup(val);
 }
 
 static inline char *json_array_get_string_safe(JSON_Array *arr, const char *i)
 {
     const char *val = json_array_get_string(arr, i);
-    if(!val) return NULL;
+    if (!val)
+        return NULL;
     return strdup(val);
 }
 
 static inline char buildFileUrl(const char *url, const char *file)
 {
-    if(!url || !file) return NULL;
+    if (!url || !file)
+        return NULL;
 
     int size = strlen(url) + strlen(file) + 2;
     char *res = malloc(size);
-    
-    if(res) {
+
+    if (res)
+    {
         memset(res, 0, size);
-        sprintf(res, "%s/%s", url, file);    
+        sprintf(res, "%s/%s", url, file);
     }
 
     return res;
@@ -180,8 +188,9 @@ static inline char *buildSlug(const char *author, const char *name, const char *
 {
     int size = strlen(author) + strlen(name) + strlen(version) + 3;
     char *slug = malloc(size);
-    
-    if(slug) {
+
+    if (slug)
+    {
         memset(slug, '\0', size);
         sprintf(slug, "%s/%s@%s", author, name, version);
     }
@@ -193,7 +202,8 @@ Package *loadPkg(const char *manifest, int verbose)
 {
     Package *pkg = NULL;
 
-    if(fs_exists(manifest) == -1) {
+    if (fs_exists(manifest) == -1)
+    {
         logger_error("error", "Missin %s", manifest);
         return NULL;
     }
@@ -201,10 +211,12 @@ Package *loadPkg(const char *manifest, int verbose)
     logger_info("info", "reading local %s", manifest);
 
     char *json = fs_read(manifest);
-    if(json == NULL) goto e1;
+    if (json == NULL)
+        goto e1;
     pkg = newPkg(json, verbose);
 
-e1: free(json);
+e1:
+    free(json);
 
     return pkg;
 }
@@ -214,7 +226,7 @@ Package *loadManifest(int verbose)
     Package *pkg = NULL;
     const char *name = "package.json";
     pkg = loadPkg(name, verbose);
-    
+
     return pkg;
 }
 
@@ -222,8 +234,9 @@ static inline char *buildRepo(const char *author, const char *name)
 {
     int size = strlen(author) + strlen(name) + 2;
     char *repo = malloc(size);
-    
-    if(repo) {
+
+    if (repo)
+    {
         memset(repo, '\0', size);
         sprintf(repo, "%s/%s", author, name);
     }
@@ -235,50 +248,62 @@ static inline list_t *parseDependencies(JSON_Object *json)
 {
     list_t *list = NULL;
 
-    if(!json) goto done;
-    if(!(list = list_new())) goto done;
+    if (!json)
+        goto done;
+    if (!(list = list_new()))
+        goto done;
 
     list->free = freeDeps;
 
-    for(int i = 0; i < json_object_get_count(json); i++) {
+    for (int i = 0; i < json_object_get_count(json); i++)
+    {
         const char *name = NULL;
         char *version = NULL;
         Dependency *dep = NULL;
         int error = 1;
 
-        if(!(name = json_object_get_name(json, i))) goto cleanLoop;
-        if(!(version = json_object_get_string_safe(json, name))) goto cleanLoop;
-        if(!(dep = newDeps(name, version))) goto cleanLoop;
-        if(!(list_rpush(list, list_node_new(dep)))) goto cleanLoop;
+        if (!(name = json_object_get_name(json, i)))
+            goto cleanLoop;
+        if (!(version = json_object_get_string_safe(json, name)))
+            goto cleanLoop;
+        if (!(dep = newDeps(name, version)))
+            goto cleanLoop;
+        if (!(list_rpush(list, list_node_new(dep))))
+            goto cleanLoop;
 
         error = 0;
 
-cleanLoop:
-        if(version) free(version);
-        if(error) {
+    cleanLoop:
+        if (version)
+            free(version);
+        if (error)
+        {
             list_destroy(list);
             list = NULL;
         }
     }
 
-done: 
+done:
     return list;
 }
 
-static inline int installPackages(list_t *list, const char *dir, int verbose) 
+static inline int installPackages(list_t *list, const char *dir, int verbose)
 {
     list_node_t *node = NULL;
     list_iterator_t *iterator = NULL;
     int rc = -1;
 
-    if(!list || !dir) goto clean;
+    if (!list || !dir)
+        goto clean;
 
     iterator = list_iterator_new(list, LIST_HEAD);
-    if(iterator == NULL) goto clean;
+    if (iterator == NULL)
+        goto clean;
 
     list_t *freeList = list_new();
 
-    while((node = list_iterator_next(iterator))) {
+    while ((node = list_iterator_next(iterator)))
+    {
         Dependency *dep = NULL;
         char *slug = NULL;
         Package *pkg = NULL;
@@ -286,19 +311,24 @@ static inline int installPackages(list_t *list, const char *dir, int verbose)
 
         dep = (Dependency *)node->val;
         slug = buildSlug(dep->author, dep->name, dep->version);
-        if(slug == NULL) goto cleanLoop;
+        if (slug == NULL)
+            goto cleanLoop;
 
         pkg = newPkgSlug(slug, verbose);
-        if(pkg == NULL) goto cleanLoop;
+        if (pkg == NULL)
+            goto cleanLoop;
 
-        if(installPkg(pkg, dir, verbose) == -1) goto cleanLoop;
+        if (installPkg(pkg, dir, verbose) == -1)
+            goto cleanLoop;
 
         list_rpush(freeList, list_node_new(pkg));
         error = 0;
 
-cleanLoop:
-        if(slug) free(slug);
-        if(error) {
+    cleanLoop:
+        if (slug)
+            free(slug);
+        if (error)
+        {
             list_iterator_destroy(iterator);
             iterator = NULL;
             rc = -1;
@@ -309,18 +339,21 @@ cleanLoop:
     rc = 0;
 
 clean:
-    if(iterator) list_iterator_destroy(iterator);
+    if (iterator)
+        list_iterator_destroy(iterator);
     iterator = list_iterator_new(freeList, LIST_HEAD);
-    while((node = list_iterator_new(iterator, LIST_HEAD))) {
+    while ((node = list_iterator_new(iterator, LIST_HEAD)))
+    {
         Package *pkg = node->val;
-        if(pkg) freePkg(pkg);
+        if (pkg)
+            freePkg(pkg);
     }
     list_iterator_destroy(iterator);
     list_destroy(freeList);
     return rc;
 }
 
-Package *newPkg(const char *json, int verbose) 
+Package *newPkg(const char *json, int verbose)
 {
     Package *pkg = NULL;
     JSON_Value *root = NULL;
@@ -330,25 +363,28 @@ Package *newPkg(const char *json, int verbose)
     JSON_Object *devs = NULL;
     int error = 1;
 
-    if(!json) {
-        if(verbose)
+    if (!json)
+    {
+        if (verbose)
             logger_error("error", "Missing JSON");
         goto clean;
     }
 
-    if(!(root = json_parse_string(json))) {
-        if(verbose)
+    if (!(root = json_parse_string(json)))
+    {
+        if (verbose)
             logger_error("error", "Unable to parse JSON");
         goto clean;
     }
 
-    if(!(jsonObj = json_value_get_object(root))) {
-        if(verbose)
-            logger_erro("error", "Invalid file");
+    if (!(jsonObj = json_value_get_object(root)))
+    {
+        if (verbose)
+            logger_error("error", "Invalid file");
         goto clean;
     }
 
-    if(!(pkg = malloc(sizeof(Package))))
+    if (!(pkg = malloc(sizeof(Package))))
         goto clean;
 
     memset(pkg, 0, sizeof(Package));
@@ -364,46 +400,54 @@ Package *newPkg(const char *json, int verbose)
     pkg->makefile = json_object_get_string_safe(jsonObj, "makefile");
     pkg->prefix = json_object_get_string_safe(jsonObj, "prefix");
     pkg->flags = json_object_get_string_safe(jsonObj, "flags");
-    
-    if(!pkg->flags)
+
+    if (!pkg->flags)
         pkg->flags = json_object_get_string_safe(jsonObj, "cflags");
 
-    if(!pkg->flags) {
+    if (!pkg->flags)
+    {
         JSON_Array *flags = json_object_get_array(jsonObj, "flags");
 
-        if(!flags)
+        if (!flags)
             flags = json_object_get_array(jsonObj, "cflags");
 
-        if(flags) {
-            for(int i = 0; i < json_array_get_count(flags); i++) {
+        if (flags)
+        {
+            for (int i = 0; i < json_array_get_count(flags); i++)
+            {
                 char *flag = json_array_get_string_safe(flags, i);
-                
-                if(flag) {
-                    if(!pkg->flags)
+
+                if (flag)
+                {
+                    if (!pkg->flags)
                         pkg->flags = "";
-    
-                    if(asprintf(&pkg->flags, "%s %s", pkg->flags, flag) == -1)
+
+                    if (asprintf(&pkg->flags, "%s %s", pkg->flags, flag) == -1)
                         goto clean;
-    
+
                     free(flag);
                 }
             }
         }
     }
-    
-    if(!pkg->repo && pkg->author && pkg->name) {
+
+    if (!pkg->repo && pkg->author && pkg->name)
+    {
         asprintf(&pkg->repo, "%s/%s", pkg->author, pkg->name);
         _debug("Creating package: %s", pkg->repo);
     }
 
-    if(!pkg->author)
+    if (!pkg->author)
         _debug("Unable to determine package author for: %s", pkg->name);
 
-    if(pkg->repo) {
-        pkg->author = repoOwner(pkg->repo, OWNER);
-        pkg->reponame = reponame(pkg->repo);
-    } else {
-        if(verbose)
+    if (pkg->repo)
+    {
+        pkg->author = GetRepoOwner(pkg->repo, OWNER);
+        pkg->reponame = GetRepoName(pkg->repo);
+    }
+    else
+    {
+        if (verbose)
             logger_warn("warning", "Missing repo for %s", pkg->name);
         pkg->author = NULL;
         pkg->reponame = NULL;
@@ -411,36 +455,49 @@ Package *newPkg(const char *json, int verbose)
 
     src = json_object_get_array(jsonObj, "src");
 
-    if(!src)
+    if (!src)
         src = json_object_get_array(jsonObj, "files");
 
-    if(src) {
-        if(!(pkg->src = list_new())) goto clean;
+    if (src)
+    {
+        if (!(pkg->src = list_new()))
+            goto clean;
         pkg->src->free = free;
-        
-        for(int i = 0; i < json_array_get_count(src); i++) {
+
+        for (int i = 0; i < json_array_get_count(src); i++)
+        {
             char *file = json_array_get_string_safe(src, i);
             _debug("file: %s", file);
-            if(!file) goto clean;
-            if(!(list_rpush(pkg->src, list_node_new(file)))) goto clean;
+            if (!file)
+                goto clean;
+            if (!(list_rpush(pkg->src, list_node_new(file))))
+                goto clean;
         }
-    } else {
+    }
+    else
+    {
         _debug("No source files listed");
         pkg->src = NULL;
     }
 
-    if((deps = json_object_get_object(jsonObj, "dependencies"))) {
-        if(!(pkg->dependencies = parseDependencies(deps))) 
+    if ((deps = json_object_get_object(jsonObj, "dependencies")))
+    {
+        if (!(pkg->dependencies = parseDependencies(deps)))
             goto clean;
-    } else {
+    }
+    else
+    {
         _debug("No dependencies listed");
         pkg->dependencies = NULL;
     }
 
-    if((devs = json_object_get_object(jsonObj, "development"))) {
-        if(!(pkg->development = parseDependencies(devs))) 
+    if ((devs = json_object_get_object(jsonObj, "development")))
+    {
+        if (!(pkg->development = parseDependencies(devs)))
             goto clean;
-    } else {
+    }
+    else
+    {
         _debug("No development dependencies listed");
         pkg->development = NULL;
     }
@@ -448,8 +505,10 @@ Package *newPkg(const char *json, int verbose)
     error = 0;
 
 clean:
-    if(root) json_value_free(root);
-    if(error && pkg) {
+    if (root)
+        json_value_free(root);
+    if (error && pkg)
+    {
         freePkg(pkg);
         pkg = NULL;
     }
@@ -470,13 +529,19 @@ static Package *pkgSlug(const char *slug, int verbose, const char *file)
     Package *pkg = NULL;
     int retries = 3;
 
-    if(!slug) goto error;
+    if (!slug)
+        goto error;
     _debug("Creating package %s", slug);
-    if(!(author = repoOwner(slug, OWNER))) goto error;
-    if(!(name = reponame(slug))) goto error;
-    if(!(version = repoVersion(slug, VERSION))) goto error;
-    if(!(url = pkgUrl(author, name, version))) goto error;
-    if(!(jsonUrl = buildFileUrl(url, file))) goto error;
+    if (!(author = GetRepoOwner(slug, OWNER)))
+        goto error;
+    if (!(name = GetRepoName(slug)))
+        goto error;
+    if (!(version = GetRepoVersion(slug, VERSION)))
+        goto error;
+    if (!(url = pkgUrl(author, name, version)))
+        goto error;
+    if (!(jsonUrl = buildFileUrl(url, file)))
+        goto error;
 
     _debug("author: %s\nname: %s\nversion: %s\n", author, name, version);
 
@@ -484,27 +549,34 @@ static Package *pkgSlug(const char *slug, int verbose, const char *file)
     pthread_mutex_unlock(&lock.mutex);
 #endif
 
-    if(ccConfigExists(author, name, version)) {
-        if(defaultOpts.skipCache) {
+    if (ccConfigExists(author, name, version))
+    {
+        if (defaultOpts.skipCache)
+        {
             ccDeleteConfig(author, name, version);
             goto download;
         }
 
         json = ccGetConfig(author, name, version);
-        if(!json) goto download;
+        if (!json)
+            goto download;
 
         log = "cache";
 
 #ifdef PTHREADS_HEADER
         pthread_mutex_unlock(&lock.mutex);
 #endif
-    } else {
-download:
+    }
+    else
+    {
+    download:
 #ifdef PTHREADS_HEADER
         pthread_mutex_unlock(&lock.mutex);
 #endif
-        if(retries-- <= 0) goto error;
-        else {
+        if (retries-- <= 0)
+            goto error;
+        else
+        {
 #ifdef PTHREADS_HEADER
             initCurlShare();
             _debug("GET %s", jsonUrl);
@@ -515,49 +587,72 @@ download:
 #endif
             json = res->data;
             _debug("status: %d", res->status);
-            if(!res || res->ok) goto download;
+            if (!res || res->ok)
+                goto download;
             log = "fetch";
         }
     }
 
-    if(verbose) logger_info(log, "%s/%s:%s", author, name, version);
+    if (verbose)
+        logger_info(log, "%s/%s:%s", author, name, version);
 
     free(jsonUrl);
     jsonUrl = NULL;
     free(name);
     name = NULL;
 
-    if(json) pkg = newPkg(json, verbose);
-    if(!pkg) goto error;
+    if (json)
+        pkg = newPkg(json, verbose);
+    if (!pkg)
+        goto error;
 
-    if(pkg->version) {
-        if(version) {
-            if(strcmp(version, VERSION) != 0) {
+    if (pkg->version)
+    {
+        if (version)
+        {
+            if (strcmp(version, VERSION) != 0)
+            {
                 _debug("Version number: %s (%s)", version, pkg->version);
                 free(pkg->version);
                 pkg->version = version;
-            } else free(version);
+            }
+            else
+                free(version);
         }
-    } else pkg->version = version;
+    }
+    else
+        pkg->version = version;
 
-    if(author && pkg->author) {
-        if(strcmp(author, pkg->author) != 0) {
+    if (author && pkg->author)
+    {
+        if (strcmp(author, pkg->author) != 0)
+        {
             free(pkg->author);
             pkg->author = author;
-        } else free(author);
-    } else pkg->author = strdup(author);
+        }
+        else
+            free(author);
+    }
+    else
+        pkg->author = strdup(author);
 
-    if(!(repo = buildRepo(pkg->author, pkg->name))) goto error;
+    if (!(repo = buildRepo(pkg->author, pkg->name)))
+        goto error;
 
-    if(pkg->repo) {
-        if(strcmp(repo, pkg->repo) != 0) {
+    if (pkg->repo)
+    {
+        if (strcmp(repo, pkg->repo) != 0)
+        {
             free(url);
-            if(!(url = pkgRepoUrl(pkg->repo, pkg->version))) goto error;
+            if (!(url = pkgRepoUrl(pkg->repo, pkg->version)))
+                goto error;
         }
 
         free(repo);
         repo = NULL;
-    } else pkg->repo = repo;
+    }
+    else
+        pkg->repo = repo;
 
     pkg->url = url;
 
@@ -565,8 +660,9 @@ download:
     pthread_mutex_lock(&lock.mutex);
 #endif
 
-    if(pkg && pkg->author && pkg->name && pkg->version) {
-        if(ccSetConfig(pkg->author, pkg->name, pkg->version, json) == -1) 
+    if (pkg && pkg->author && pkg->name && pkg->version)
+    {
+        if (ccSetConfig(pkg->author, pkg->name, pkg->version, json) == -1)
             _debug("Failed to cache: %s/%s:%s", pkg->author, pkg->name, pkg->version);
         else
             _debug("Cached: %s/%s:%s", pkg->author, pkg->name, pkg->version);
@@ -576,11 +672,14 @@ download:
     pthread_mutex_unlock(&lock.mutex);
 #endif
 
-    if(res) {
+    if (res)
+    {
         http_get_free(res);
         json = NULL;
         res = NULL;
-    } else {
+    }
+    else
+    {
         free(json);
         json = NULL;
     }
@@ -588,8 +687,8 @@ download:
     return pkg;
 
 error:
-    if(retries == 0)
-        if(verbose && author && name && file)
+    if (retries == 0)
+        if (verbose && author && name && file)
             logger_warn("warning", "Unable to fetch %s/%s:%s", author, name, file);
 
     free(author);
@@ -598,22 +697,25 @@ error:
     free(url);
     free(jsonUrl);
     free(repo);
-    
-    if(!res && json) free(json);
-    if(res) http_get_free(res);
-    if(pkg) freePkg(pkg);
+
+    if (!res && json)
+        free(json);
+    if (res)
+        http_get_free(res);
+    if (pkg)
+        freePkg(pkg);
 
     return NULL;
 }
 
-Package *newPkgSlug(const char *slug, int verbose) 
+Package *newPkgSlug(const char *slug, int verbose)
 {
     Package *pkg = NULL;
     const char *name = "package.json";
     unsigned int i = 0;
-    
+
     pkg = pkgSlug(slug, verbose, name);
-    if(pkg != NULL)
+    if (pkg != NULL)
         pkg->filename = (char *)name;
 
     return pkg;
@@ -621,17 +723,19 @@ Package *newPkgSlug(const char *slug, int verbose)
 
 char *pkgUrl(const char *author, const char *name, const char *version)
 {
-    if(!author || !name || !version) return NULL;
+    if (!author || !name || !version)
+        return NULL;
 
     int size = strlen(GITHUB_RAW_CONTENT_URL) + strlen(author) + strlen(name) + strlen(version) + 3;
 
-    if(defaultOpts.token != 0) 
+    if (defaultOpts.token != 0)
         size += (strlen(defaultOpts.token) + 1);
 
     char *slug = malloc(size);
-    if(slug) {
+    if (slug)
+    {
         memset(slug, '\0', size);
-        if(defaultOpts.token != 0)
+        if (defaultOpts.token != 0)
             sprintf(slug, GITHUB_RAW_CONTENT_AUTH_URL "%s/%s:%s", defaultOpts.token, author, name, version);
         else
             sprintf(slug, GITHUB_RAW_CONTENT_URL "%s/%s:%s", author, name, version);
@@ -640,18 +744,20 @@ char *pkgUrl(const char *author, const char *name, const char *version)
     return slug;
 }
 
-char *pkgRepoUrl(const char *repo, const char *version) 
+char *pkgRepoUrl(const char *repo, const char *version)
 {
-    if(!repo || !version) return NULL;
+    if (!repo || !version)
+        return NULL;
     int size = strlen(GITHUB_RAW_CONTENT_URL) + strlen(repo) + strlen(version) + 2;
 
-    if(defaultOpts.token != 0) 
+    if (defaultOpts.token != 0)
         size += (strlen(defaultOpts.token) + 1);
 
     char *slug = malloc(size);
-    if(slug) {
+    if (slug)
+    {
         memset(slug, '\0', size);
-        if(defaultOpts.token != 0)
+        if (defaultOpts.token != 0)
             sprintf(slug, GITHUB_RAW_CONTENT_AUTH_URL "%s/%s", defaultOpts.token, repo, version);
         else
             sprintf(slug, GITHUB_RAW_CONTENT_URL, "%s/%s", repo, version);
@@ -660,27 +766,29 @@ char *pkgRepoUrl(const char *repo, const char *version)
     return slug;
 }
 
-char *pkgAuthor(const char *slug) 
+char *pkgAuthor(const char *slug)
 {
-    return repoOwner(slug, OWNER);
+    return GetRepoOwner(slug, OWNER);
 }
 
 char *pkgVersion(const char *slug)
 {
-    return repoVersion(slug, VERSION);
+    return GetRepoVersion(slug, VERSION);
 }
 
-char *pkgName(const char *slug) 
+char *pkgName(const char *slug)
 {
-    return reponame(slug);
+    return GetRepoName(slug);
 }
 
-Dependency *newDeps(const char *repo, const char *version) 
+Dependency *newDeps(const char *repo, const char *version)
 {
-    if(!repo || !version) return NULL;
+    if (!repo || !version)
+        return NULL;
 
     Dependency *dep = malloc(sizeof(Dependency));
-    if(!dep) return NULL;
+    if (!dep)
+        return NULL;
 
     dep->version = strcmp("*", version) == 0 ? strdup(VERSION) : strdup(version);
     dep->name = pkgName(repo);
@@ -699,18 +807,21 @@ static int fetchFile(Package *pkg, const char *dir, char *file, int verbose)
 
     _debug("Fetch file: %s/%s", pkg->repo, file);
 
-    if(pkg == NULL) return 1;
-    if(pkg->url == NULL) return 1;
+    if (pkg == NULL)
+        return 1;
+    if (pkg->url == NULL)
+        return 1;
 
-    if(strncmp(file, "http", 4))
+    if (strncmp(file, "http", 4))
         url = strdup(file);
-    else if(!(url = buildFileUrl(pkg->url, file)))
+    else if (!(url = buildFileUrl(pkg->url, file)))
         return 1;
 
     _debug("File URL: %s", url);
 
-    if(!(path = path_join,(dir, basename(file)))) {
-        rc =1;
+    if (!(path = path_join, (dir, basename(file))))
+    {
+        rc = 1;
         goto clean;
     }
 
@@ -718,8 +829,10 @@ static int fetchFile(Package *pkg, const char *dir, char *file, int verbose)
     pthread_mutex_lock(&lock.mutex);
 #endif
 
-    if(defaultOpts.force == 1 || fs_exists(path) == -1) {
-        if(verbose) {
+    if (defaultOpts.force == 1 || fs_exists(path) == -1)
+    {
+        if (verbose)
+        {
             logger_info("Fetch", "%s:%s", pkg->repo, file);
             fflush(stdout);
         }
@@ -729,14 +842,18 @@ static int fetchFile(Package *pkg, const char *dir, char *file, int verbose)
 #endif
         rc = http_get_file_shared(url, path, cpcs);
         saved = 1;
-    } else {
+    }
+    else
+    {
 #ifdef PTHREADS_HEADER
         pthread_mutex_unlock(&lock.mutex);
 #endif
     }
 
-    if(rc == -1) {
-        if(verbose) {
+    if (rc == -1)
+    {
+        if (verbose)
+        {
 #ifdef PTHREADS_HEADER
             pthread_mutex_lock(&lock.mutex);
 #endif
@@ -750,8 +867,10 @@ static int fetchFile(Package *pkg, const char *dir, char *file, int verbose)
         }
     }
 
-    if(saved) {
-        if(verbose) {
+    if (saved)
+    {
+        if (verbose)
+        {
 #ifdef PTHREADS_HEADER
             pthread_mutex_lock(&lock.mutex);
 #endif
@@ -769,7 +888,7 @@ clean:
     return rc;
 }
 
-static void *fetchThreadFile(void *arg) 
+static void *fetchThreadFile(void *arg)
 {
     Thread *data = arg;
     int *status = malloc(sizeof(int));
@@ -780,15 +899,16 @@ static void *fetchThreadFile(void *arg)
     return (void *)rc;
 }
 
-static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void **data) 
+static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void **data)
 {
 #ifdef PTHREADS_HEADER
     return fetchFile(pkg, dir, file, verbose);
 #else
     Thread *fetch = malloc(sizeof(*fetch));
     int rc = 0;
-    
-    if(fetch == 0) return -1;
+
+    if (fetch == 0)
+        return -1;
 
     *data = 0;
 
@@ -801,7 +921,8 @@ static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void
 
     rc = pthread_attr_init(&fetch->attr);
 
-    if(rc != 0) {
+    if (rc != 0)
+    {
         free(fetch);
         return rc;
     }
@@ -809,7 +930,8 @@ static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void
     (void)pkg->refs++;
     rc = pthread_create(&fetch->thread, NULL, fetchThreadFile, fetch);
 
-    if(rc != 0) {
+    if (rc != 0)
+    {
         pthread_attr_destroy(&fetch->attr);
         free(fetch);
         return rc;
@@ -817,7 +939,8 @@ static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void
 
     rc = pthread_attr_destroy(&fetch->attr);
 
-    if(rc != 0) {
+    if (rc != 0)
+    {
         pthread_cancel(fetch->thread);
         free(fetch);
         return rc;
@@ -855,23 +978,26 @@ int installExe(Package *pkg, char *dir, int verbose)
 
     tmp = gettempdir();
 
-    if(tmp == NULL) {
-        if(verbose)
+    if (tmp == NULL)
+    {
+        if (verbose)
             logger_error("error", "gettempdir() out of memory");
         return -1;
     }
 
-    if(!pkg->repo) {
-        if(verbose) 
+    if (!pkg->repo)
+    {
+        if (verbose)
             logger_error("error", "Repo field missing");
         return -1;
     }
 
     reponame = strrchr(pkg->repo, '/');
-    if(reponame && *reponame != '\0')
+    if (reponame && *reponame != '\0')
         reponame++;
-    else {
-        if(verbose) 
+    else
+    {
+        if (verbose)
             logger_error("error", "Repo name should formatted as user/pkg");
         return -1;
     }
@@ -882,8 +1008,9 @@ int installExe(Package *pkg, char *dir, int verbose)
 
     rc = http_get_file_shared(url, tarball, cpcs);
 
-    if(rc != 0) {
-        if(verbose) 
+    if (rc != 0)
+    {
+        if (verbose)
             logger_error("error", "Failed to download '%s@%s' - HTTP GET '%s'", pkg->repo, pkg->version, url);
         goto clean;
     }
@@ -896,15 +1023,17 @@ int installExe(Package *pkg, char *dir, int verbose)
     _debug("command(extract): %s", command);
 
     rc = system(command);
-    if(rc != 0) goto clean;
+    if (rc != 0)
+        goto clean;
     free(command);
     command = NULL;
 
-    if(defaultOpts.prefix != NULL || pkg->prefix != NULL) {
+    if (defaultOpts.prefix != NULL || pkg->prefix != NULL)
+    {
         char path[pathMax];
         memset(path, 0, pathMax);
 
-        if(defaultOpts.prefix) 
+        if (defaultOpts.prefix)
             realpath(defaultOpts.prefix, path);
         else
             realpath(pkg->prefix, path);
@@ -915,33 +1044,40 @@ int installExe(Package *pkg, char *dir, int verbose)
     }
 
     const char *configure = pkg->configure;
-    if(configure == 0) configure = ":";
+    if (configure == 0)
+        configure = ":";
 
     memset(dirPath, 0, pathMax);
     realpath(dir, dirPath);
 
     char *version = pkg->version;
-    if(version[0] == 'v') version++;
+    if (version[0] == 'v')
+        version++;
 
     E_FORMAT(&unpackDir, "%s/%s-%s", tmp, reponame, version);
     _debug("dir: %s", unpackDir);
 
-    if(pkg->dependencies) {
+    if (pkg->dependencies)
+    {
         E_FORMAT(&deps, "%s/deps", unpackDir);
         _debug("deps: %s", deps);
-        rc = installDeps(pkg, deps, verbose); 
-        if(rc == -1) goto clean;
+        rc = installDeps(pkg, deps, verbose);
+        if (rc == -1)
+            goto clean;
     }
 
-    if(!defaultOpts.global && pkg->makefile) {
+    if (!defaultOpts.global && pkg->makefile)
+    {
         E_FORMAT(&command, "cp -fr %s/%s/%s %s", dirPath, pkg->name, basename(pkg->makefile), unpackDir);
 
         rc = system(command);
-        if(rc != 0) goto clean;
+        if (rc != 0)
+            goto clean;
         free(command);
     }
 
-    if(pkg->flags) {
+    if (pkg->flags)
+    {
         char *flags = NULL;
 #ifdef _GNU_SOURCE
         char *cflags = secure_getenv("CFLAGS");
@@ -949,7 +1085,7 @@ int installExe(Package *pkg, char *dir, int verbose)
         char *cflags = getenv("CFLAGS");
 #endif
 
-        if(cflags) 
+        if (cflags)
             asprintf(&flags, "%s %s", cflags, pkg->flags);
         else
             asprintf(&flags, "%s", pkg->flags);
@@ -970,7 +1106,7 @@ clean:
     return rc;
 }
 
-int installPkg(Package *pkg, const char *dir, int verbose) 
+int installPkg(Package *pkg, const char *dir, int verbose)
 {
     list_iterator_t *iterator = NULL;
     char *pkgJson = NULL;
@@ -994,7 +1130,8 @@ int installPkg(Package *pkg, const char *dir, int verbose)
 #endif
 
 #ifdef PACKAGE_PREFIX
-    if(defaultOpts.prefix == 0) {
+    if (defaultOpts.prefix == 0)
+    {
 #ifdef PTHREADS_HEADER
         pthread_mutex_lock(&lock.mutex);
 #endif
@@ -1005,7 +1142,8 @@ int installPkg(Package *pkg, const char *dir, int verbose)
     }
 #endif
 
-    if(defaultOpts.prefix == 0) {
+    if (defaultOpts.prefix == 0)
+    {
 #ifdef PTHREADS_HEADER
         pthread_mutex_lock(&lock.mutex);
 #endif
@@ -1015,14 +1153,16 @@ int installPkg(Package *pkg, const char *dir, int verbose)
         char *prefix = getenv("PREFIX");
 #endif
 
-        if(prefix) defaultOpts.prefix = prefix;
+        if (prefix)
+            defaultOpts.prefix = prefix;
 
 #ifdef PTHREADS_HEADER
         pthread_mutex_unlock(&lock.mutex);
 #endif
     }
 
-    if(visitedPackages == 0) {
+    if (visitedPackages == 0)
+    {
 #ifdef PTHREADS_HEADER
         pthread_mutex_lock(&lock.mutex);
 #endif
@@ -1034,12 +1174,14 @@ int installPkg(Package *pkg, const char *dir, int verbose)
 #endif
     }
 
-    if(defaultOpts.force == 0 && pkg && pkg->name) {
+    if (defaultOpts.force == 0 && pkg && pkg->name)
+    {
 #ifdef PTHREADS_HEADER
         pthread_mutex_lock(&lock.mutex);
 #endif
 
-        if(hash_has(visitedPackages, pkg->name)) {
+        if (hash_has(visitedPackages, pkg->name))
+        {
 #ifdef PTHREADS_HEADER
             pthread_mutex_lock(&lock.mutex);
 #endif
@@ -1052,82 +1194,97 @@ int installPkg(Package *pkg, const char *dir, int verbose)
 
 #ifdef PTHREADS_HEADER
     Thread **fetchs = 0;
-    if(pkg != NULL && pkg->src != NULL) 
-        if(pkg->src->len > 0)
+    if (pkg != NULL && pkg->src != NULL)
+        if (pkg->src->len > 0)
             fetchs = malloc(pkg->src->len * sizeof(Thread));
 
-    if(fetchs) 
+    if (fetchs)
         memset(fetchs, 0, pkg->src->len * sizeof(Thread));
 #endif
 
-    if(!pkg || !dir) {
-        rc = -1;
-        goto clean;
-    } 
-
-    if(!(pkgDir = path_join(dir, pkg->name))) {
+    if (!pkg || !dir)
+    {
         rc = -1;
         goto clean;
     }
 
-    if(!defaultOpts.global) {
+    if (!(pkgDir = path_join(dir, pkg->name)))
+    {
+        rc = -1;
+        goto clean;
+    }
+
+    if (!defaultOpts.global)
+    {
         _debug("mkdir -p %s", pkgDir);
-        if(mkdirp(pkgDir, 0777) == -1) {
+        if (mkdirp(pkgDir, 0777) == -1)
+        {
             rc = -1;
             goto clean;
         }
     }
 
-    if(pkg->url == NULL) {
+    if (pkg->url == NULL)
+    {
         pkg->url = pkgUrl(pkg->author, pkg->reponame, pkg->version);
-        if(pkg->url == NULL) {
+        if (pkg->url == NULL)
+        {
             rc = -1;
             goto clean;
         }
     }
 
-    if(!(pkgJson = path_join(pkgDir, pkg->filename))) {
+    if (!(pkgJson = path_join(pkgDir, pkg->filename)))
+    {
         rc = -1;
         goto clean;
     }
 
-    if(!defaultOpts.global && pkg->src != NULL) {
+    if (!defaultOpts.global && pkg->src != NULL)
+    {
         _debug("write: %s", pkgJson);
-        if(fs_write(pkgJson, pkg->json) == -1) {
-            if(verbose)
+        if (fs_write(pkgJson, pkg->json) == -1)
+        {
+            if (verbose)
                 logger_error("error", "Failed to write %s", pkgJson);
             rc = -1;
             goto clean;
         }
     }
 
-    if(pkg->name) {
+    if (pkg->name)
+    {
 #ifdef PTHREADS_HEADER
         pthread_mutex_lock(&lock.mutex);
 #endif
-        if(!hash_has(visitedPackages, pkg->name))
+        if (!hash_has(visitedPackages, pkg->name))
             hash_set(visitedPackages, strdup(pkg->name), "t");
 #ifdef PTHREADS_HEADER
         pthread_mutex_unlock(&lock.mutex);
 #endif
     }
 
-    if(!defaultOpts.global && pkg->makefile) {
+    if (!defaultOpts.global && pkg->makefile)
+    {
         _debug("fetch: %s/%s", pkg->repo, pkg->makefile);
         void *fetch = 0;
         rc = fetchPkg(pkg, pkgDir, pkg->makefile, verbose, &fetch);
-        if(rc != 0) goto clean;
+        if (rc != 0)
+            goto clean;
 
 #ifdef PTHREADS_HEADER
-        if(fetch != 0) {
+        if (fetch != 0)
+        {
             Thread *data = fetch;
             int *status;
             pthread_join(data->thread, (void **)&status);
-            if(status != NULL) {
+            if (status != NULL)
+            {
                 rc = *status;
                 free(status);
                 status = 0;
-                if(rc != 0) {
+                if (rc != 0)
+                {
                     rc = 0;
                     logger_warn("warning", "Unable to fetch Makefile (%s) fir '%s'", pkg->makefile, pkg->name);
                 }
@@ -1136,14 +1293,17 @@ int installPkg(Package *pkg, const char *dir, int verbose)
 #endif
     }
 
-    if(defaultOpts.global || pkg->src == NULL) goto install;
+    if (defaultOpts.global || pkg->src == NULL)
+        goto install;
 
 #ifdef PTHREADS_HEADER
     pthread_mutex_lock(&lock.mutex);
 #endif
-    
-    if(ccConfigExists(pkg->author, pkg->name, pkg->version)) {
-        if(defaultOpts.skipCache) {
+
+    if (ccConfigExists(pkg->author, pkg->name, pkg->version))
+    {
+        if (defaultOpts.skipCache)
+        {
             ccDeleteConfig(pkg->author, pkg->name, pkg->version);
 #ifdef PTHREADS_HEADER
             pthread_mutex_unlock(&lock.mutex);
@@ -1151,7 +1311,7 @@ int installPkg(Package *pkg, const char *dir, int verbose)
             goto download;
         }
 
-        if(verbose)
+        if (verbose)
             logger_info("Cache", pkg->repo);
 
 #ifdef PTHREADS_HEADER
@@ -1168,10 +1328,12 @@ download:
     iterator = list_iterator_new(pkg->src, LIST_HEAD);
     list_node_t *source;
 
-    while((source = list_iterator_next(iterator))) {
+    while ((source = list_iterator_next(iterator)))
+    {
         void *fetch = NULL;
         rc = fetchPkg(pkg, pkgDir, source->val, verbose, &fetch);
-        if(rc != 0) {
+        if (rc != 0)
+        {
             list_iterator_destroy(iterator);
             iterator = NULL;
             rc = -1;
@@ -1182,13 +1344,17 @@ download:
         usleep(1024 * 10);
 #endif
 #ifdef PTHREADS_HEADER
-        if(i < 0) i = 0;
+        if (i < 0)
+            i = 0;
         fetchs[i] = fetch;
         pending++;
 
-        if(i < max) i++;
-        else {
-            while(--i >= 0) {
+        if (i < max)
+            i++;
+        else
+        {
+            while (--i >= 0)
+            {
                 Thread *data = fetch[i];
                 int *status;
                 pthread_join(data->thread, (void **)&status);
@@ -1197,20 +1363,21 @@ download:
 
                 pending--;
 
-                if(NULL != status) {
+                if (NULL != status)
+                {
                     rc = *status;
                     free(status);
                     status = 0;
                 }
 
-                if(rc != 0) {
+                if (rc != 0)
+                {
                     rc = -1;
                     goto clean;
                 }
 
-
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-        usleep(1024 * 10);
+                usleep(1024 * 10);
 #endif
             }
         }
@@ -1218,7 +1385,8 @@ download:
     }
 
 #ifdef PTHREADS_HEADER
-    while(--i >= 0) {
+    while (--i >= 0)
+    {
         Thread *data = fetch[i];
         int *status;
         pthread_join(data->thread, (void **)&status);
@@ -1226,13 +1394,15 @@ download:
         free(data);
         fetchs[i] = NULL;
 
-        if(status == NULL) {
+        if (status == NULL)
+        {
             rc = *status;
             free(status);
             status = 0;
         }
 
-        if(rc != 0) {
+        if (rc != 0)
+        {
             rc = -1;
             goto clean;
         }
@@ -1247,13 +1417,17 @@ download:
 #endif
 
 install:
-    if(pkg->configure) {
-        if(defaultOpts.prefix != NULL && pkg->prefix != NULL) {
+    if (pkg->configure)
+    {
+        if (defaultOpts.prefix != NULL && pkg->prefix != NULL)
+        {
             char path[pathMax];
             memset(path, 0, pathMax);
 
-            if(defaultOpts.prefix) realpath(defaultOpts.prefix, path);
-            else realpath(pkg->prefix, path);
+            if (defaultOpts.prefix)
+                realpath(defaultOpts.prefix, path);
+            else
+                realpath(pkg->prefix, path);
 
             _debug("env PREFIX: %s", path);
             setenv("PREFIX", path, 1);
@@ -1262,51 +1436,64 @@ install:
         E_FORMAT(&command, "cd %s/%s && %s", dir, pkg->name, pkg->configure);
         _debug("command(configure): %s", command);
         rc = system(command);
-        if(rc != 0) goto clean;
+        if (rc != 0)
+            goto clean;
     }
 
-    if(rc == 0 && pkg->install)
+    if (rc == 0 && pkg->install)
         rc = installExe(pkg, dir, verbose);
-    if(rc == 0)
+    if (rc == 0)
         rc = installDeps(pkg, dir, verbose);
 
 clean:
-    if(pkgDir) free(pkgDir);
-    if(pkgJson) free(pkgJson);
-    if(iterator) list_iterator_destroy(iterator);
-    if(command) free(command);
+    if (pkgDir)
+        free(pkgDir);
+    if (pkgJson)
+        free(pkgJson);
+    if (iterator)
+        list_iterator_destroy(iterator);
+    if (command)
+        free(command);
 #ifdef PTHREADS_HEADER
-    if(pkg != NULL && pkg->src != NULL)
-        if(pkg->src->len > 0)
-            if(fetchs) free(fetchs);
+    if (pkg != NULL && pkg->src != NULL)
+        if (pkg->src->len > 0)
+            if (fetchs)
+                free(fetchs);
     fetchs = NULL;
 #endif
     return rc;
 }
 
-int installDeps(Package *pkg, const char *dir, int verbose) 
+int installDeps(Package *pkg, const char *dir, int verbose)
 {
-    if(!pkg || !dir) return -1;
-    if(pkg->dependencies == NULL) return 0;
+    if (!pkg || !dir)
+        return -1;
+    if (pkg->dependencies == NULL)
+        return 0;
     return installPackages(pkg->dependencies, dir, verbose);
 }
 
 int installDev(Package *pkg, const char *dir, int verbose)
 {
-    if(!pkg || !dir) return -1;
-    if(pkg->development == NULL) return 0;
+    if (!pkg || !dir)
+        return -1;
+    if (pkg->development == NULL)
+        return 0;
     return installPackages(pkg->development, dir, verbose);
 }
 
-void freePkg(Package *pkg) 
+void freePkg(Package *pkg)
 {
-    if(pkg == NULL) return;
-    if(pkg->refs != 0) return;
+    if (pkg == NULL)
+        return;
+    if (pkg->refs != 0)
+        return;
 
-#define FREE(k)\
-    if(pkg->k) {\
-        free(pkg->k);\
-        pkg->k = 0;\
+#define FREE(k)       \
+    if (pkg->k)       \
+    {                 \
+        free(pkg->k); \
+        pkg->k = 0;   \
     }
 
     FREE(author);
@@ -1324,15 +1511,15 @@ void freePkg(Package *pkg)
     FREE(flags);
 #undef FREE
 
-    if(pkg->src) 
+    if (pkg->src)
         list_destroy(pkg->src);
     pkg->src = 0;
 
-    if(pkg->dependencies)
+    if (pkg->dependencies)
         list_destroy(pkg->dependencies);
     pkg->dependencies = 0;
 
-    if(pkg->development) 
+    if (pkg->development)
         list_destroy(pkg->development);
     pkg->development = 0;
 
@@ -1340,8 +1527,7 @@ void freePkg(Package *pkg)
     pkg = 0;
 }
 
-
-void freeDeps(Dependency *dep) 
+void freeDeps(Dependency *dep)
 {
     free(dep->name);
     free(dep->author);
@@ -1349,13 +1535,14 @@ void freeDeps(Dependency *dep)
     free(dep);
 }
 
-void cleanPkgs() 
+void cleanPkgs()
 {
-    if(visitedPackages != 0) {
+    if (visitedPackages != 0)
+    {
         hash_each(visitedPackages, {
-                free(key);
-                val;
-                });
+            free(key);
+            val;
+        });
 
         hash_free(visitedPackages);
         visitedPackages = 0;
@@ -1363,265 +1550,3 @@ void cleanPkgs()
 
     curl_share_cleanup(cpcs);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
