@@ -1,9 +1,16 @@
 #ifndef _LLIST_HEADER_
 #define _LLIST_HEADER_
 
-struct llist {
+struct llist
+{
 	struct Node *head;
 	int count;
+};
+
+struct Node
+{
+	void *data;
+	struct Node *next;
 };
 
 extern struct llist *llcreate(void);

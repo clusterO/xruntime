@@ -1,12 +1,28 @@
 #ifndef _HASHTABLE_HEADER_
 #define _HASHTABLE_HEADER_
 
-struct Hashtable {
-    int size; 
-    int numEntries; 
-    float load; 
+struct Hashtable
+{
+    int size;
+    int numEntries;
+    float load;
     struct llist **bucket;
     int (*hashf)(void *data, int dataSize, int bucketCount);
+};
+
+struct Htent
+{
+    void *key;
+    int keySize;
+    int hashedKey;
+    void *data;
+};
+
+// ll cleaner
+struct Payload
+{
+    void *arg;
+    void (*f)(void *, void *);
 };
 
 extern struct Hashtable *hcreate(int size, int (*hashf)(void *, int, int));

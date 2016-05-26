@@ -1,58 +1,60 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+
 #include "file.h"
 
-struct Data *loadFile(char *filename) 
+struct Data *loadFile(char *filename)
 {
-    char *buffer, *p;
-    struct stat buf;
-    int readBytes, remainingBytes, totalBytes = 0;
+    struct stat fileStat;
 
-    if(stat(filename, &buf) == -1)
+    if (stat(filename, &fileStat) == -1)
         return NULL;
 
-    if(!(buf.st_mode & S_IFREG)) 
+    if (!(fileStat.st_mode & S_IFREG))
         return NULL;
 
     FILE *fp = fopen(filename, "rb");
-
-    if(fp == NULL)
+    if (fp == NULL)
         return NULL;
 
-    remainingBytes = buf.st_size;
-    p = buffer = malloc(remainingBytes);
+    int fileSize = fileStat.st_size;
+    char *buffer = malloc(fileSize);
 
-    if(buffer == NULL)
+    if (buffer == NULL)
+    {
+        fclose(fp);
         return NULL;
-
-    while(readBytes = fread(p, 1, remainingBytes, fp), readBytes != 0 && remainingBytes > 0) {
-        if(readBytes == -1) {
-            free(buffer);
-            return NULL;
-        }
-
-        remainingBytes -= readBytes;
-        p += readBytes;
-        totalBytes += readBytes;
     }
 
-    struct Data *fileData = malloc(sizeof *fileData);
+    size_t bytesRead = fread(buffer, 1, fileSize, fp);
+    fclose(fp);
 
-    if(fileData == NULL) {
+    if (bytesRead != fileSize)
+    {
+        free(buffer);
+        return NULL;
+    }
+
+    struct Data *fileData = malloc(sizeof(struct Data));
+
+    if (fileData == NULL)
+    {
         free(buffer);
         return NULL;
     }
 
     fileData->data = buffer;
-    fileData->size = totalBytes;
+    fileData->size = fileSize;
 
     return fileData;
 }
 
-void freeFile(struct Data *fileData) 
+void freeFile(struct Data *fileData)
 {
-    free(fileData->data);
-    free(fileData);
+    if (fileData != NULL)
+    {
+        free(fileData->data);
+        free(fileData);
+    }
 }
-

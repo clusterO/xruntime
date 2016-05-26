@@ -1,7 +1,8 @@
 #ifndef _WEBCACHE_HEADER_
 #define _WEBCACHE_HEADER_
 
-struct CacheEntry {
+struct CacheEntry
+{
     char *path;
     char *type;
     int length;
@@ -10,8 +11,8 @@ struct CacheEntry {
     struct CacheEntry *prev, *next;
 };
 
-
-struct Cache {
+struct Cache
+{
     struct Hashtable *index;
     struct CacheEntry *head, *tail;
     int maxSize;
@@ -24,5 +25,9 @@ extern struct Cache *createCache(int maxSize, int hashSize);
 extern void freeCache(struct Cache *cache);
 extern void cput(struct Cache *cache, char *path, char *contentType, void *content, int contentLength);
 extern struct CacheEntry *cget(struct Cache *cache, char *path);
+
+struct CacheEntry *dllRemoveTail(struct Cache *cache);
+void dllMoveToHead(struct Cache *cache, struct CacheEntry *ce);
+void dllInsertHead(struct Cache *cache, struct CacheEntry *ce);
 
 #endif

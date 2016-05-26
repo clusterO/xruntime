@@ -1,7 +1,8 @@
 #ifndef _FILEL_HEADER_
 #define _FILEL_HEADER_
 
-struct Data {
+struct Data
+{
     int size;
     void *data;
 };
