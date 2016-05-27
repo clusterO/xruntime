@@ -1,8 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "hashtable.h"
 #include "cache.h"
 
 /**
@@ -53,12 +48,13 @@ struct Cache *createCache(int maxSize, int hashSize)
 {
     struct Cache *cache = malloc(sizeof(struct Cache));
 
-    cache->index = hcreate(hashSize, NULL);
+    cache->index = hcreate(hashSize, NULL); // NULL to use default hash function
     cache->head = NULL;
     cache->tail = NULL;
     cache->maxSize = maxSize;
     cache->size = 0; // Initialize the size to 0
 
+    printf("cache[%d,%d]created\n", cache->maxSize, cache->index->size);
     return cache;
 }
 
@@ -76,6 +72,7 @@ void cput(struct Cache *cache, char *path, char *contentType, void *content, int
     struct CacheEntry *entry = allocateEntry(path, contentType, content, contentLength);
 
     dllInsertHead(cache, entry);
+
     hput(cache->index, path, entry);
     cache->size++;
 
@@ -100,10 +97,9 @@ void cput(struct Cache *cache, char *path, char *contentType, void *content, int
 struct CacheEntry *cget(struct Cache *cache, char *path)
 {
     struct CacheEntry *entry = hget(cache->index, path);
+
     if (entry == NULL)
-    {
         return NULL;
-    }
     else
     {
         dllMoveToHead(cache, entry);

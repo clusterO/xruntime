@@ -1,12 +1,4 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-
-#include "llist.h"
 #include "hashtable.h"
-
-#define DEFAULT_SIZE 128
-#define DEFAULT_GROW_FACTOR 2
 
 void addEntryCount(struct Hashtable *ht, int d)
 {
@@ -54,18 +46,18 @@ struct Hashtable *hcreate(int size, int (*hashf)(void *, int, int))
     for (int i = 0; i < size; i++)
     {
         ht->bucket[i] = llcreate();
-        /*
-        if (ht->bucket[i] == NULL)
-        {
-            // Cleanup allocated buckets
-            for (int j = 0; j < i; j++)
-                llfree(ht->bucket[j]);
-            free(ht->bucket);
-            free(ht);
-            return NULL;
-        }*/
+        /*  if (ht->bucket[i] == NULL)
+            {
+                // Cleanup allocated buckets
+                for (int j = 0; j < i; j++)
+                    llfree(ht->bucket[j]);
+                free(ht->bucket);
+                free(ht);
+                return NULL;
+            }   */
     }
 
+    printf("hashtable of size %d created\n", ht->size);
     return ht;
 }
 
@@ -89,11 +81,7 @@ void hdestroy(struct Hashtable *ht)
 
 void *hput(struct Hashtable *ht, char *key, void *data)
 {
-    return hputBin(ht, key, strlen(key), data);
-}
-
-void *hputBin(struct Hashtable *ht, void *key, int keySize, void *data)
-{
+    int keySize = strlen(key);
     int index = ht->hashf(key, keySize, ht->size);
     struct llist *llist = ht->bucket[index];
 
@@ -138,11 +126,7 @@ int htcmp(void *a, void *b)
 
 void *hget(struct Hashtable *ht, char *key)
 {
-    return hgetBin(ht, key, strlen(key));
-}
-
-void *hgetBin(struct Hashtable *ht, void *key, int keySize)
-{
+    int keySize = strlen(key);
     int index = ht->hashf(key, keySize, ht->size);
     struct llist *llist = ht->bucket[index];
 
@@ -159,11 +143,7 @@ void *hgetBin(struct Hashtable *ht, void *key, int keySize)
 
 void *hdelete(struct Hashtable *ht, char *key)
 {
-    return hdeleteBin(ht, key, strlen(key));
-}
-
-void *hdeleteBin(struct Hashtable *ht, void *key, int keySize)
-{
+    int keySize = strlen(key);
     int index = ht->hashf(key, keySize, ht->size);
     struct llist *llist = ht->bucket[index];
 

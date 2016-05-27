@@ -1,5 +1,11 @@
-#ifndef _WEBCACHE_HEADER_
-#define _WEBCACHE_HEADER_
+#ifndef _WEB_CACHE_HEADER_
+#define _WEB_CACHE_HEADER_
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "hashtable.h"
 
 struct CacheEntry
 {

@@ -1,5 +1,7 @@
-#ifndef _LLIST_HEADER_
-#define _LLIST_HEADER_
+#ifndef _LINKED_LIST_HEADER_
+#define _LINKED_LIST_HEADER_
+
+#include <stdlib.h>
 
 struct llist
 {

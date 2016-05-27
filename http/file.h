@@ -1,5 +1,9 @@
-#ifndef _FILEL_HEADER_
-#define _FILEL_HEADER_
+#ifndef _LOCAL_FILE_HEADER_
+#define _LOCAL_FILE_HEADER_
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
 
 struct Data
 {

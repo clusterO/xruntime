@@ -1,29 +1,9 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <time.h>
-#include <sys/file.h>
-#include <fcntl.h>
+#include "server.h"
 
-#include "net.h"
-#include "file.h"
-#include "mime.h"
-#include "cache.h"
-
-#define MAX_RESPONSE_SIZE 262144
-#define PORT "3490"
-#define SERVER_FILES "./serverfiles"
-#define SERVER_ROOT "./serverroot"
-
-int response(int fd, const char *header, const char *contentType, const void *body, int contentLength)
+int response(int fd, const char *header, const char *contentType, const char *body, int contentLength)
 {
+    // header construction
+
     time_t currentTime = time(NULL);
     struct tm *localTime = localtime(&currentTime);
     char timestamp[64];
@@ -35,65 +15,9 @@ int response(int fd, const char *header, const char *contentType, const void *bo
 
     int rv = send(fd, response, responseLength, 0);
     if (rv < 0)
-    {
         perror("send");
-    }
+
     return rv;
-}
-
-void getData(int fd)
-{
-    const char *data = "SOME DATA";
-    const int contentLength = strlen(data);
-    response(fd, "HTTP/1.1 200 OK", "text/plain", data, contentLength);
-}
-
-void getFile(int fd, struct Cache *cache, const char *path)
-{
-    char filePath[4096];
-    struct Data *fileData;
-    char *mimeType;
-
-    if (strcmp(path, "/") == 0)
-        snprintf(filePath, sizeof(filePath), "%s/index.html", SERVER_ROOT);
-    else
-        snprintf(filePath, sizeof(filePath), "%s%s", SERVER_ROOT, path);
-
-    fileData = loadFile(filePath);
-
-    if (fileData == NULL)
-    {
-        notFound(fd);
-        return;
-    }
-
-    mimeType = getMimeType(filePath);
-    cput(cache, filePath, mimeType, fileData->data, fileData->size);
-    response(fd, "HTTP/1.1 200 OK", mimeType, fileData->data, fileData->size);
-
-    free(mimeType);
-    freeFile(fileData);
-}
-
-char *findBodyStart(char *header) {}
-
-void notFound(int fd)
-{
-    const char *filePath = "./serverfiles/404.html";
-    struct Data *fileData;
-    char *mimeType;
-
-    fileData = loadFile(filePath);
-
-    if (fileData == NULL)
-    {
-        fprintf(stderr, "Cannot find system 404 file\n");
-        exit(3);
-    }
-
-    mimeType = getMimeType(filePath);
-    response(fd, "HTTP/1.1 404 NOT FOUND", mimeType, fileData->data, fileData->size);
-    freeFile(fileData);
 }
 
 void request(int fd, struct Cache *cache)
@@ -111,40 +35,56 @@ void request(int fd, struct Cache *cache)
     char method[256], path[16384];
     sscanf(request, "%s %s", method, path);
 
-    if (strcmp("/data", path) == 0)
+    if (0) // Reading from cache - OFF
     {
-        getData(fd);
-        return;
+        struct CacheEntry *entry = cget(cache, path);
+
+        if (entry != NULL)
+        {
+            char *body = "<h1>hello world¡</h1>";
+            int res = response(fd, "HTTP/1.1 200 OK", "text/plain", body, sizeof(char) * strlen(body));
+            return;
+        }
+
+        free(entry);
     }
 
-    struct CacheEntry *entry = cget(cache, path);
+    char *mimeType;
 
-    if (entry == NULL)
+    // should be handled by a router
+    if (strcmp("GET", method) == 0)
     {
-        notFound(fd);
-    }
-    else if (strcmp("GET", method) == 0)
-    {
-        getFile(fd, cache, path);
+        struct Data *fileData = getData(fd, cache, path, mimeType);
+
+        if (fileData == NULL)
+        {
+            fileData = notFound(fd);
+            response(fd, "HTTP/1.1 404 NOT FOUND", mimeType, fileData->data, fileData->size);
+        }
+        else
+            response(fd, "HTTP/1.1 200 OK", mimeType, fileData->data, fileData->size);
     }
     else if (strcmp("POST", method) == 0)
     {
-        // Handle POST request
+        // handle POST request
     }
-    else
+    else // complete other HTTP request methods OPTIONS, DELETE, and TRACE...
     {
-        notFound(fd);
+        // handle the requests
+        mimeType = "application/json";
+        char *body = "{'data': 'error'}";
+        response(fd, "HTTP/1.1 404 NOT FOUND", mimeType, body, sizeof(char) * strlen(body));
     }
-
-    free(entry);
 }
 
-int main(void)
+// dynamic configuration as arguments
+int server()
 {
     struct sockaddr_storage addr;
     char s[INET6_ADDRSTRLEN];
-    struct Cache *cache = createCache(10, 0);
     int listenfd = getSocketListner(PORT);
+
+    struct Cache *cache = createCache(10, 0); // hashSize DEFAULT_SIZE 128
 
     if (listenfd < 0)
     {
@@ -169,8 +109,16 @@ int main(void)
         printf("server: got connection from %s\n", s);
 
         request(newfd, cache);
+
         close(newfd);
     }
 
     return 0;
+}
+
+// rename variables and functions
+// turn this to a lib/package/module
+int main(void)
+{
+    server();
 }

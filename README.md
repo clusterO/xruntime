@@ -2,22 +2,35 @@
 
 ## The first goal of this project is to implement a web server
 
-The major parts of this section are:
+#### The major parts of this section are:
 
 - [x] An http request handler
 - [x] An http response builder
 - [x] A caching mechanism (LRU)
-- [x] Concurency manager
+- [_] Concurency manager
+- [_] See code comments
 
-### Test C server \*
+#### Compile using GCC
 
-- curl -D - http://localhost:3490/
-- curl -D - http://localhost:3490/number
-- curl -D - http://localhost:3490/date
+```bash
+cd http
+gcc server.c llist.c hashtable.c cache.c file.c mime.c net.c helpers/request.c -o server -w
+```
 
-##### Posting Data:
+#### Test HTTP server
 
-- curl -D - -X POST -H 'Content-Type: text/plain' -d 'Hello, sample data!' http://localhost:3490/save
+- curl http://localhost:3490/
+- curl http://localhost:3490/data
+  <!-- - curl http://localhost:3490/number -->
+  <!-- - curl http://localhost:3490/date -->
+
+#### Post data:
+
+- curl -XPOST -H'Content-Type: text/plain' -D'Hello, sample data!' http://localhost:3490/save
+
+#### Resources:
+
+- [HTTP](https://developer.mozilla.org/en-US/docs/Web/HTTP)
 
 ## The second phase is to add a dependency manager to the system
 
@@ -30,7 +43,8 @@ The major parts of this section are:
 #### Compile using GCC
 
 ```bash
-gcc cpm.c -o cpm -I /mnt/data/2020/C\ runtime\ env/x\ runtime/cpm/ libs/asprintf.c libs/case.c libs/commander.c libs/console-colors.c libs/copy.c libs/debug.c libs/fs.c libs/hash.c libs/http-get.c libs/list.c libs/list_iterator.c libs/list_node.c libs/mkdirp.c libs/parse-repo.c libs/parson.c libs/path-join.c libs/path-normalize.c libs/rimraf.c libs/strdup.c libs/str-ends-with.c libs/str-flatten.c libs/str-starts-with.c libs/substr.c libs/trim.c libs/which.c libs/tempdir.c libs/wiki-registry.c libs/wildcardcmp.c common/cache.c common/package.c gumbo-parser/attribute.c gumbo-parser/char_ref.c gumbo-parser/error.c gumbo-parser/get-element-by-id.c gumbo-parser/get-elements-by-tag-name.c gumbo-parser/gumbo-text-content.c gumbo-parser/parser.c gumbo-parser/string_buffer.c gumbo-parser/string_piece.c gumbo-parser/tag.c gumbo-parser/tokenizer.c gumbo-parser/utf8.c gumbo-parser/util.c gumbo-parser/vector.c -lcurl -lpthread
+cd cpm
+gcc cpm.c libs/asprintf.c libs/case.c libs/commander.c libs/console-colors.c libs/copy.c libs/debug.c libs/fs.c libs/hash.c libs/http-get.c libs/list.c libs/list_iterator.c libs/list_node.c libs/mkdirp.c libs/parse-repo.c libs/parson.c libs/path-join.c libs/path-normalize.c libs/rimraf.c libs/strdup.c libs/str-ends-with.c libs/str-flatten.c libs/str-starts-with.c libs/substr.c libs/trim.c libs/which.c libs/tempdir.c libs/wiki-registry.c libs/wildcardcmp.c common/cache.c common/package.c gumbo-parser/attribute.c gumbo-parser/char_ref.c gumbo-parser/error.c gumbo-parser/get-element-by-id.c gumbo-parser/get-elements-by-tag-name.c gumbo-parser/gumbo-text-content.c gumbo-parser/parser.c gumbo-parser/string_buffer.c gumbo-parser/string_piece.c gumbo-parser/tag.c gumbo-parser/tokenizer.c gumbo-parser/utf8.c gumbo-parser/util.c gumbo-parser/vector.c -lcurl -lpthread -o cpm -w
 ```
 
 ## The third phase is to incorporate object oriented and functional programming styles
@@ -41,4 +55,4 @@ gcc cpm.c -o cpm -I /mnt/data/2020/C\ runtime\ env/x\ runtime/cpm/ libs/asprintf
 - [ ] Fix Wall Wextra
 - [ ] Functional tests
 
-## V8/TSC Binding
+## The fourth phase is V8/TSC Binding

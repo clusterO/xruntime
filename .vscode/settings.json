@@ -55,6 +55,9 @@
     "net.h": "c",
     "file.h": "c",
     "llist.h": "c",
-    "hashtable.h": "c"
+    "hashtable.h": "c",
+    "request.h": "c",
+    "mime.h": "c",
+    "server.h": "c"
   }
 }

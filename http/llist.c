@@ -1,5 +1,3 @@
-#include <stdlib.h>
-
 #include "llist.h"
 
 struct llist *llcreate(void)
@@ -74,21 +72,22 @@ void *lltail(struct llist *llist)
 
 void *llfind(struct llist *llist, void *data, int (*cmpfn)(void *, void *))
 {
-    struct Node *n = llist->head;
-    if (n == NULL)
+    struct Node *head = llist->head;
+    if (head == NULL)
         return NULL;
 
-    while (n != NULL)
+    while (head != NULL)
     {
-        if (cmpfn(data, n->data) == 0)
+        if (cmpfn(data, head->data) == 0)
             break;
 
-        n = n->next;
+        head = head->next;
     }
 
-    if (n == NULL)
+    if (head == NULL)
         return NULL;
-    return n->data;
+
+    return head->data;
 }
 
 void *lldelete(struct llist *llist, void *data, int (*cmpfn)(void *, void *))
