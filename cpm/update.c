@@ -1,44 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <libgen.h>
-#include <curl/curl.h>
-#include "libs/debug.h"
-#include "libs/fs.h"
-#include "libs/http-get.h"
-#include "libs/logger.h"
-#include "libs/commander.h"
-#include "libs/parson.h"
-#include "common/package.h"
-#include "common/cache.h"
-
-#ifndef VERSION
-#define VERSION "0.1.0"
-#endif
-
-#define PACKAGE_CACHE_TIME 2592000
-
-#ifdef PTHREADS_HEADER
-#define MAX_THREADS 12
-#endif
-
-#if defined(_WIN32) || defined(WIN32) || defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
-#define setenv(n, v, o) _putenv_s(n, v)
-#define realpath(p, rp) _fullpath(p, rp, strlen(p))
-#endif
-
-debug_t debugger = {0};
-
-struct options {
-    char const *dir;
-    char *prefix;
-    char *token;
-    char verbose;
-    int dev;
-#ifdef PTHREADS_HEADER
-    unsigned int concurrency;
-#endif
-};
+#include "update.h"
 
 static struct options opts = {0};
 static Options pkgOpts = {0};
@@ -75,38 +35,46 @@ static setDev(command_t *self)
 }
 
 #ifdef PTHREADS_HEADER
-static void setConcurrency(command_t *self) 
+static void setConcurrency(command_t *self)
 {
-    if(self->arg) {
+    if (self->arg)
+    {
         opts.concurrency = atol(self->arg);
         debug(&debugger, "set concurrency: %lu", opts.concurrency);
-    } 
+    }
 }
 #endif
 
 static int installLocalPackages()
 {
-	const char *file = "manifest.json";
-	
-    if(fs_exists(file) == -1) {
+    const char *file = "manifest.json";
+
+    if (fs_exists(file) == -1)
+    {
         logger_error("error", "Missing config file");
         return 1;
     }
 
     debug(&debugger, "reading local config file");
     char *json = fs_read(file);
-    if(json == NULL) return 1;
+    if (json == NULL)
+        return 1;
 
     Package *pkg = newPkg(json, opts.verbose);
-    if(pkg == NULL) goto e1;
-    if(pkg->prefix) setenv("PREFIX", pkg->prefix, 1);
+    if (pkg == NULL)
+        goto e1;
+    if (pkg->prefix)
+        setenv("PREFIX", pkg->prefix, 1);
 
     int rc = installDeps(pkg, opts.dir, opts.verbose);
-    if(rc == -1) goto e2;
+    if (rc == -1)
+        goto e2;
 
-    if(opts.dev) {
+    if (opts.dev)
+    {
         rc = installDev(pkg, opts.dir, opts.verbose);
-        if(rc == -1) goto e2;
+        if (rc == -1)
+            goto e2;
     }
 
     free(json);
@@ -127,10 +95,12 @@ static int writeDeps(Package *pkg, char *prefix)
     JSON_Object *pkgJsonObj = json_object(pkgJson);
     JSON_Value *newDep = NULL;
 
-    if(pkgJson == NULL || pkgJsonObj == NULL) return 1;
+    if (pkgJson == NULL || pkgJsonObj == NULL)
+        return 1;
 
     JSON_Object *dep = json_object_dotget_object(pkgJsonObj, prefix);
-    if(dep == NULL) {
+    if (dep == NULL)
+    {
         newDep = json_value_init_object();
         dep = json_value_get_object(newDep);
         json_object_set_value(pkgJsonObj, prefix, newDep);
@@ -143,7 +113,7 @@ static int writeDeps(Package *pkg, char *prefix)
     return rc;
 }
 
-static int installPackage(const char *slug) 
+static int installPackage(const char *slug)
 {
     Package *pkg = NULL;
     int rc;
@@ -156,55 +126,65 @@ static int installPackage(const char *slug)
     pathMax = 4096;
 #endif
 
-    if(!rootPkg) {
+    if (!rootPkg)
+    {
         const char *name = "manifest.json";
         char *json = fs_read(name);
-        
-        if(json)
+
+        if (json)
             rootPkg = newPkg(json, opts.verbose);
     }
-    
-    if(slug[0] == '.')
-        if(strlen(slug) == 1 || (slug[1] == '/' && strlen(slug))) {
+
+    if (slug[0] == '.')
+        if (strlen(slug) == 1 || (slug[1] == '/' && strlen(slug)))
+        {
             char dir[pathMax];
             realpath(slug, dir);
             slug = dir;
             return installLocalPackages();
         }
 
-    if(fs_exists(slug) == 0) {
+    if (fs_exists(slug) == 0)
+    {
         fs_stats *stats = fs_stat(slug);
-        if(stats != NULL && (S_IFREG == (stats->st_mode & S_IFMT)
+        if (stats != NULL && (S_IFREG == (stats->st_mode & S_IFMT)
 #if defined(__unix__) || defined(__linux__) || defined(_POSIX_VERSION)
-                    || S_IFLNK == (stats->st_mode & S_IFMT)
+                              || S_IFLNK == (stats->st_mode & S_IFMT)
 #endif
-                    )) {
+                                  ))
+        {
             free(stats);
             return installLocalPackages();
         }
 
-        if(stats) free(stats);
+        if (stats)
+            free(stats);
     }
 
-    if(!pkg)
+    if (!pkg)
         pkg = newPkgSlug(slug, opts.verbose);
 
-    if(pkg == NULL) return -1;
+    if (pkg == NULL)
+        return -1;
 
-    if(rootPkg && rootPkg->prefix) {
+    if (rootPkg && rootPkg->prefix)
+    {
         pkgOpts.prefix = rootPkg->prefix;
         setPkgOptions(pkgOpts);
     }
 
     rc = installPkg(pkg, opts.dir, opts.verbose);
-    if(rc != 0) goto clean;
+    if (rc != 0)
+        goto clean;
 
-    if(rc == 0 && opts.dev) {
+    if (rc == 0 && opts.dev)
+    {
         rc = installDev(pkg, opts.dir, opts.verbose);
-        if(rc != 0) goto clean;
+        if (rc != 0)
+            goto clean;
     }
 
-    if(pkg->repo == 0 || strcmp(slug, pkg->repo) != 0)
+    if (pkg->repo == 0 || strcmp(slug, pkg->repo) != 0)
         pkg->repo = strdup(slug);
 
 clean:
@@ -214,9 +194,11 @@ clean:
 
 static int installPackages(int n, char **pkgs)
 {
-    for(int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++)
+    {
         debug(&debugger, "install %s (%d)", pkgs[i], i);
-        if(installPackage(pkgs[i]) == -1) return 1;
+        if (installPackage(pkgs[i]) == -1)
+            return 1;
     }
 
     return 0;
@@ -248,7 +230,7 @@ int main(int argc, char **argv)
     command_t program;
     command_init(&program, "update", VERSION);
     program.usage = "[options] [name <>]";
-    
+
     command_option(&program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
     command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
     command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
@@ -261,10 +243,11 @@ int main(int argc, char **argv)
 
     debug(&debugger, "%d arguments", program.argc);
 
-    if(curl_global_init(CURL_GLOBAL_ALL) != 0) 
+    if (curl_global_init(CURL_GLOBAL_ALL) != 0)
         logger_error("error", "Failed to init cURL");
 
-    if(opts.prefix) {
+    if (opts.prefix)
+    {
         char prefix[pathMax];
         memset(prefix, 0, pathMax);
         realpath(opts.prefix, prefix);
@@ -288,7 +271,8 @@ int main(int argc, char **argv)
 
     setPkgOptions(pkgOpts);
 
-    if(opts.prefix) {
+    if (opts.prefix)
+    {
         setenv("CPM_PREFIX", opts.prefix, 1);
         setenv("PREFIX", opts.prefix, 1);
     }
@@ -302,36 +286,3 @@ int main(int argc, char **argv)
     command_free(&program);
     return code;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

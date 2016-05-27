@@ -1,65 +1,14 @@
-#include <errno.h>
-#include <libgen.h>
-#include <limits.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <pthread.h>
-#include "libs/asprintf.h"
-#include "libs/commander.h"
-#include "libs/debug.h"
-#include "libs/fs.h"
-#include "libs/hash.h"
-#include "libs/list.h"
-#include "libs/logger.h"
-#include "libs/path-join.h"
-#include "libs/str-flatten.h"
-#include "libs/trim.h"
-#include "common/cache.h"
-#include "common/package.h"
-#include <curl/curl.h>
-
-#ifndef VERSION
-#define VERSION "0.1.0"
-#endif
-
-#ifdef _WIN32
-#include <direct.h>
-#define getcwd _getcwd
-#endif
-
-#define PACKAGE_CACHE_TIME 2592000
-
-#ifdef PTHREADS_HEADER
-#define MAX_THREADS 4
-#endif
-
-#if defined(_WIN32) || defined(WIN32) || defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
-#define setenv(n, v, o) _putenv_s(n, v)
-#define realpath(p, rp) _fullpath(p, rp, strlen(p))
-#endif
-
-struct options {
-    const char *dir;
-    char *prefix;
-    int force;
-    int verbose;
-    int dev;
-    int skipCache;
-    int flags;
-    int global;
-#ifdef PTHREADS_HEADER
-    unsigned int concurrency;
-#endif
-};
+#include "configure.h"
 
 char **argV = 0;
 int argC = 0;
 int offset = 0;
+
 Options pkgOpts = {0};
 Package *rootPkg = NULL;
 debug_t debugger = {0};
 hash_t *configured = 0;
+
 struct options opts = {
     .skipCache = 0,
     .verbose = 1,
@@ -75,59 +24,60 @@ struct options opts = {
 #endif
 };
 
-static void setCache(command_t *self) 
+static void setCache(command_t *self)
 {
     opts.skipCache = 1;
     debug(&debugger, "set skip cache flag");
 }
 
-static void setDev(command_t *self) 
+static void setDev(command_t *self)
 {
     opts.dev = 1;
     debug(&debugger, "set dev flag");
 }
 
-static void setForce(command_t *self) 
+static void setForce(command_t *self)
 {
     opts.force = 1;
     debug(&debugger, "set force flag");
 }
 
-static void setGlobal(command_t *self) 
+static void setGlobal(command_t *self)
 {
     opts.global = 1;
     debug(&debugger, "set global flag");
 }
 
-static void setFlags(command_t *self) 
+static void setFlags(command_t *self)
 {
     opts.flags = 1;
     opts.verbose = 0;
     debug(&debugger, "set flags flag");
 }
 
-static void setPrefix(command_t *self) 
+static void setPrefix(command_t *self)
 {
     opts.prefix = (char *)self->arg;
     debug(&debugger, "set prefix: %s", opts.prefix);
 }
 
-static void setDir(command_t *self) 
+static void setDir(command_t *self)
 {
     opts.dir = (char *)self->arg;
     debug(&debugger, "set dir: %s", opts.dir);
 }
 
-static void unsetVerbose(command_t *self) 
+static void unsetVerbose(command_t *self)
 {
     opts.verbose = 0;
     debug(&debugger, "set quiet flag");
 }
 
 #ifdef PTHREADS_HEADER
-static void setConcurrency(command_t *self) 
+static void setConcurrency(command_t *self)
 {
-    if(self->arg) {
+    if (self->arg)
+    {
         opts.concurrency = atol(self->arg);
         debug(&debugger, "set concurrenc: %lu", opts.concurrency);
     }
@@ -137,11 +87,13 @@ static void setConcurrency(command_t *self)
 #ifdef PTHREADS_HEADER
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-struct Thread {
+struct Thread
+{
     const char *dir;
 };
 
-void *configurePackageThread(void *arg) {
+void *configurePackageThread(void *arg)
+{
     Thread *wrap = arg;
     const char *dir = wrap->dir;
     configurePackage(dir);
@@ -162,21 +114,24 @@ int configurePackage(const char *dir)
 #else
     pathMax = 4096;
 #endif
-    
+
     char *path = path_join(dir, "manifest.json");
-    if(path == 0) return -ENOMEM;
-    
+    if (path == 0)
+        return -ENOMEM;
+
 #ifdef PTHREADS_HEADER
     pthread_mutex_lock(&mutex);
 #endif
 
-    if(!rootPkg) {
+    if (!rootPkg)
+    {
         const char *name = "manifest.json";
         const *json = fs_read(name);
-        if(json) 
+        if (json)
             rootPkg = newPkg(json, opts.verbose);
 
-        if(rootPkg && rootPkg->prefix) {
+        if (rootPkg && rootPkg->prefix)
+        {
             char prefix[pathMax];
             memset(prefix, 0, pathMax);
             realpath(rootPkg->prefix, prefix);
@@ -188,7 +143,8 @@ int configurePackage(const char *dir)
         }
     }
 
-    if(hash_has(configured, path)) {
+    if (hash_has(configured, path))
+    {
 #ifdef PTHREADS_HEADER
         pthread_mutex_unlock(&mutex);
 #endif
@@ -199,19 +155,22 @@ int configurePackage(const char *dir)
     pthread_mutex_unlock(&mutex);
 #endif
 
-    if(fs_exists(path) == 0) {
+    if (fs_exists(path) == 0)
+    {
         debug(&debugger, "reading %s", path);
         json = fs_read(path);
     }
 
-    if(json != 0) {
+    if (json != 0)
+    {
 #ifdef DEBUG
         pkg = newPkg(json, 1);
 #else
         pkg = newPkg(json, 0);
 #endif
-        
-    } else {
+    }
+    else
+    {
 #ifdef DEBUG
         pkg = newPkgSlug(dir, 1);
 #else
@@ -219,12 +178,14 @@ int configurePackage(const char *dir)
 #endif
     }
 
-    if(!pkg) {
+    if (!pkg)
+    {
         rc = -ENOMEM;
         goto clean;
     }
 
-    if(pkg->flags != 0 && opts.flags) {
+    if (pkg->flags != 0 && opts.flags)
+    {
 #ifdef PTHREADS_HEADER
         rc = pthread_mutex_lock(&mutex);
 #endif
@@ -232,20 +193,26 @@ int configurePackage(const char *dir)
         ok = 1;
         fprintf(stdout, "%s ", trim(pkg->flags));
         fflush(stdout);
-    } else if(pkg->configure != 0) {
+    }
+    else if (pkg->configure != 0)
+    {
         char *command = 0;
         char *args = argC > 0 ? str_flatten((const char **)argV, 0, argC) : "";
 
         asprintf(&command, "cd %s && %s %s", dir, pkg->configure, args);
 
-        if(rootPkg && rootPkg->prefix) {
+        if (rootPkg && rootPkg->prefix)
+        {
             pkgOpts.prefix = rootPkg->prefix;
             setPkgOptions(pkgOpts);
             setenv("PREFIX", pkgOpts.prefix, 1);
-        } else if(opts.prefix) {
+        }
+        else if (opts.prefix)
+        {
             setenv("PREFIX", opts.prefix, 1);
-    
-        } else if(pkg->prefix) {
+        }
+        else if (pkg->prefix)
+        {
             char prefix[pathMax];
             memset(prefix, 0, pathMax);
             realpath(pkg->prefix, prefix);
@@ -257,8 +224,10 @@ int configurePackage(const char *dir)
             setenv("PREFIX", pkg->prefix, 1);
         }
 
-        if(argC > 0) free(args);
-        if(opts.verbose != 0) logger_warn("configure", "%s: %s", pkg->name, pkg->configure);
+        if (argC > 0)
+            free(args);
+        if (opts.verbose != 0)
+            logger_warn("configure", "%s: %s", pkg->name, pkg->configure);
 
         debug(&debugger, "system: %s", command);
         rc = system(command);
@@ -270,7 +239,9 @@ int configurePackage(const char *dir)
 
         hash_set(configured, path, "t");
         ok = 1;
-    } else {
+    }
+    else
+    {
 #ifdef PTHREADS_HEADER
         rc = pthread_mutex_lock(&mutex);
 #endif
@@ -279,13 +250,15 @@ int configurePackage(const char *dir)
         ok = 1;
     }
 
-    if(rc != 0) goto clean;
+    if (rc != 0)
+        goto clean;
 
 #ifdef PTHREADS_HEADER
     pthread_mutex_unlock(&mutex);
 #endif
 
-    if(pkg->dependencies != 0) {
+    if (pkg->dependencies != 0)
+    {
         list_iterator_t *iterator = 0;
         list_node_t *node = 0;
 
@@ -297,7 +270,8 @@ int configurePackage(const char *dir)
 
         iterator = list_iterator_new(pkg->dependencies, LIST_HEAD);
 
-        while((node = list_iterator_next(iterator))) {
+        while ((node = list_iterator_next(iterator)))
+        {
             Dependency *dep = node->val;
             char *slug = 0;
             asprintf(&slug, "%s/%s@%s", dep->author, dep->name, dep->version);
@@ -314,8 +288,10 @@ int configurePackage(const char *dir)
             wrap->dir = depDir;
             rc = pthread_create(thread, 0, configurePackageThread, wrap);
 
-            if(opts.concurrency <= ++i) {
-                for(int j = 0; j < 0; ++j) {
+            if (opts.concurrency <= ++i)
+            {
+                for (int j = 0; j < 0; ++j)
+                {
                     pthread_join(threads[j], 0);
                     free((void *)wraps[j].dir);
                 }
@@ -324,10 +300,12 @@ int configurePackage(const char *dir)
             }
 
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-            if(!opts.flags) usleep(10240);
+            if (!opts.flags)
+                usleep(10240);
 #endif
 #else
-            if(depDir == 0) {
+            if (depDir == 0)
+            {
                 rc = -ENOMEM;
                 goto clean;
             }
@@ -335,21 +313,25 @@ int configurePackage(const char *dir)
             rc = configurePackage(depDir);
             free((void *)depDir);
 
-            if(rc != 0) goto clean;
+            if (rc != 0)
+                goto clean;
 #endif
         }
 
 #ifdef PTHREADS_HEADER
-        for(int j = 0; j < i; ++j) {
+        for (int j = 0; j < i; ++j)
+        {
             pthread_join(threads[j], 0);
             free((void *)wraps[j].dir);
         }
 #endif
 
-        if(iterator != 0) list_iterator_destroy(iterator);
+        if (iterator != 0)
+            list_iterator_destroy(iterator);
     }
 
-    if(opts.dev && pkg->development) {
+    if (opts.dev && pkg->development)
+    {
         list_iterator_t *iterator = 0;
         list_node_t *node = 0;
 #ifdef PTHREADS_HEADER
@@ -359,7 +341,8 @@ int configurePackage(const char *dir)
 #endif
 
         iterator = list_iterator_new(pkg->development, LIST_HEAD);
-        while((node = list_iterator_next(iterator))) {
+        while ((node = list_iterator_next(iterator)))
+        {
             Dependency *dep = node->val;
             char *slug = 0;
             asprintf(&slug, "%s/%s@%s", dep->author, dep->name, dep->version);
@@ -373,8 +356,10 @@ int configurePackage(const char *dir)
             pthread_t *thread = &threads[i];
             wrap->dir = depDir;
             rc = pthread_create(thread, 0, configurePackageThread, wrap);
-            if(opts.concurrency <= ++i) {
-                for(int j = 0; j < i, ++j) {
+            if (opts.concurrency <= ++i)
+            {
+                for (int j = 0; j < i, ++j)
+                {
                     pthread_join(threads[j], 0);
                     free((void *)wraps[j].dir);
                 }
@@ -383,43 +368,47 @@ int configurePackage(const char *dir)
             }
 
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-            if(!opts.flags) usleep(10240);
+            if (!opts.flags)
+                usleep(10240);
 #endif
 #else
-            if(depDir == 0) {
+            if (depDir == 0)
+            {
                 rc = -ENOMEM;
                 goto clean;
             }
 
             rc = configurePackage(depDir);
             free((void *)depDir);
-            if(rc != 0) goto clean;
+            if (rc != 0)
+                goto clean;
 #endif
         }
 
 #ifdef PTHREADS_HEADER
-        for(int j = 0; j < i; ++j) {
+        for (int j = 0; j < i; ++j)
+        {
             pthread_join(threads[j], 0);
             free((void *)wraps[j].dir);
         }
 #endif
 
-        if(iterator != 0)
-            list_iterator_destroy(iterator); 
+        if (iterator != 0)
+            list_iterator_destroy(iterator);
     }
 
 clean:
-    if(pkg != 0)
+    if (pkg != 0)
         freePkg(pkg);
-    if(json != 0)
+    if (json != 0)
         free(json);
-    if(ok == 0)
-        if(path != 0)
+    if (ok == 0)
+        if (path != 0)
             free(path);
     return rc;
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
     int rc = 0;
     long pathMax;
@@ -434,11 +423,12 @@ int main(int argc, char **argv)
     char CWD[pathMax];
     memset(CWD, 0, pathMax);
 
-    if(getcwd(CWD, pathMax) == 0) return -errno;
+    if (getcwd(CWD, pathMax) == 0)
+        return -errno;
 
     configured = hash_new();
     hash_set(configured, "configure", VERSION);
-    
+
     command_t program;
     command_init(&program, "configure", VERSION);
     debug_init(&debugger, "configure");
@@ -457,7 +447,8 @@ int main(int argc, char **argv)
 #endif
     command_parse(&program, argc, argv);
 
-    if(opts.dir) {
+    if (opts.dir)
+    {
         char dir[pathMax];
         memset(dir, 0, pathMax);
         realpath(opts.dir, dir);
@@ -467,7 +458,8 @@ int main(int argc, char **argv)
         memcpy((void *)opts.dir, dir, size);
     }
 
-    if(opts.prefix) {
+    if (opts.prefix)
+    {
         char prefix[pathMax];
         memset(prefix, 0, pathMax);
         realpath(opts.prefix, prefix);
@@ -479,31 +471,38 @@ int main(int argc, char **argv)
 
     offset = program.argc;
 
-    if(argc > 0) {
+    if (argc > 0)
+    {
         int rest = 0;
         int i = 0;
-        do {
+        do
+        {
             char *arg = program.nargv[i];
-            if(arg && arg[0] == '-' && arg[1] == '-' && strlen(arg) == 2) {
+            if (arg && arg[0] == '-' && arg[1] == '-' && strlen(arg) == 2)
+            {
                 rest = 1;
                 offset = i + 1;
-            } else if(arg && rest)
+            }
+            else if (arg && rest)
                 (void)argC++;
-        } while(program.nargv[++i]);
+        } while (program.nargv[++i]);
     }
 
-    if(argC > 0) {
+    if (argC > 0)
+    {
         argV = malloc(argC * sizeof(char *));
         memset(argV, 0, argC * sizeof(char *));
 
         int j = 0;
         int i = offset;
-        do {
+        do
+        {
             argV[j++] = program.nargv[i++];
-        } while(program.nargv[i]);
+        } while (program.nargv[i]);
     }
 
-    if(curl_global_init(CURL_GLOBAL_ALL)) {
+    if (curl_global_init(CURL_GLOBAL_ALL))
+    {
         logger_error("error", "Failed to init cURL");
         return 1;
     }
@@ -517,118 +516,99 @@ int main(int argc, char **argv)
 
     setPkgOptions(pkgOpts);
 
-    if(opts.prefix) {
+    if (opts.prefix)
+    {
         setenv("CPM_PREFIX", opts.prefix, 1);
         setenv("PREFIX", opts.prefix, 1);
     }
 
-    if(opts.force) setenv("FORCE", opts.force, 1);
+    if (opts.force)
+        setenv("FORCE", opts.force, 1);
 
-    if(program.argc == 0 || (argc == offset + argC))
+    if (program.argc == 0 || (argc == offset + argC))
         rc = configurePackage(CWD);
-    else {
-        for(int i = 1; i <= offset; ++i) {
+    else
+    {
+        for (int i = 1; i <= offset; ++i)
+        {
             char *dep = program.nargv[i];
-            if(dep[0] == '.') {
+            if (dep[0] == '.')
+            {
                 char dir[pathMax];
                 memset(dir, 0, pathMax);
-                dep = realpath(dep , dir);
-            } else {
+                dep = realpath(dep, dir);
+            }
+            else
+            {
                 fs_stats *stats = fs_stat(dep);
-                if(!stats)
+                if (!stats)
                     dep = path_join(opts.dir, dep);
                 else
                     free(stats);
             }
 
-        fs_stats *stats = fs_stat(dep);
+            fs_stats *stats = fs_stat(dep);
 
-        if(stats && (S_IFREG == (stats->st_mode & S_IFMT)
+            if (stats && (S_IFREG == (stats->st_mode & S_IFMT)
 #if defined(__unix__) || defined(__linux__) || defined(_POSIX_VERSION)
-                    || S_IFLNK == (stats->st_mode & S_IFMT)
+                          || S_IFLNK == (stats->st_mode & S_IFMT)
 #endif
-                   )) {
-            dep = basename(dep);
-            rc = configurePackage(dirname(dep));
-        } else {
-            rc = configurePackage(dep);
+                              ))
+            {
+                dep = basename(dep);
+                rc = configurePackage(dirname(dep));
+            }
+            else
+            {
+                rc = configurePackage(dep);
 
-            if(rc != 0) 
-                rc = configurePackage(program.nargv[i]);
-        }
+                if (rc != 0)
+                    rc = configurePackage(program.nargv[i]);
+            }
 
-        if(stats) {
-            free(stats);
-            stats = 0;
+            if (stats)
+            {
+                free(stats);
+                stats = 0;
+            }
         }
-	  }
     }
 
     int totalConfigured = 0;
     hash_each(configured, {
-            if(strncmp("t", val, 1)) 
-                (void)totalConfigured++;
-            if(key != 0)
-                free((void *)key);
-            });
+        if (strncmp("t", val, 1))
+            (void)totalConfigured++;
+        if (key != 0)
+            free((void *)key);
+    });
 
     hash_free(configured);
     command_free(&program);
     curl_global_cleanup();
     cleanPkgs();
 
-    if(opts.dir)
+    if (opts.dir)
         free(opts.dir);
 
-    if(opts.prefix)
+    if (opts.prefix)
         free(opts.prefix);
 
-    if(argC > 0) {
+    if (argC > 0)
+    {
         free(argV);
         offset = 0;
         argC = 0;
         argV = 0;
     }
 
-    if(rc == 0) {
-        if(opts.flags && totalConfigured > 0)
+    if (rc == 0)
+    {
+        if (opts.flags && totalConfigured > 0)
             printf("\n");
 
-        if(opts.verbose) 
+        if (opts.verbose)
             logger_info("info", "configured %d packages", totalConfigured);
     }
 
     return rc;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
