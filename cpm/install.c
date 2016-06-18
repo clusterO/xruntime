@@ -4,6 +4,106 @@ static struct options opts = {0};
 static Options pkgOpts = {0};
 static Package *rootPkg = NULL;
 
+#ifdef PTHREADS_HEADER
+static void setConcurrency(command_t *self)
+{
+    if (self->arg)
+    {
+        opts.concurrency = atol(self->arg);
+        debug(&debugger, "set concurrency: %lu", opts.concurrency);
+    }
+}
+#endif
+
+int main(int argc, char **argv)
+{
+    long pathMax;
+#ifdef _WIN32
+    opts.dir = ".\\deps";
+#else
+    opts.dir = "./deps";
+#endif
+
+    opts.verbose = 1;
+    opts.dev = 0;
+
+#ifdef PATH_MAX
+    pathMax = PATH_MAX;
+#elif defined(_PC_PATH_MAX)
+    pathMax = pathconf(opts.dir, _PC_PATH_MAX);
+#else
+    pathMax = 4096;
+#endif
+
+    debug_init(&debugger, "install");
+    ccInit(PACKAGE_CACHE_TIME);
+
+    command_t program;
+    command_init(&program, "intall", VERSION);
+    program.usage = "[options] [name <>]";
+
+    command_option(&program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
+    command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
+    command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
+    command_option(&program, "-d", "--dev", "install develmopent dependency", setDev);
+    command_option(&program, "-S", "--save", "Save dependency in manifest.json", setSave);
+    command_option(&program, "-D", "--save-dev", "Save develmopent dependency to manifest.json", setSaveDev);
+    command_option(&program, "-f", "--force", "Force the action", setForce);
+    command_option(&program, "-c", "--skip-cache", "Skip cache when installing", setSkipCache);
+    command_option(&program, "-g", "--global", "Global install", setGlobal);
+    command_option(&program, "-t", "--token <token>", "Set access token", setToken);
+#ifdef PTHREADS_HEADER
+    command_option(&program, "-C", "--concurrency <number>", "Set concurrency", setConcurrency);
+#endif
+    command_parse(&program, argc, argv);
+
+    debug(&debugger, "%d arguments", program.argc);
+
+    if (curl_global_init(CURL_GLOBAL_ALL) != 0)
+        logger_error("error", "Failed to initialize cURL");
+
+    if (opts.prefix)
+    {
+        char prefix[pathMax];
+        memset(prefix, 0, pathMax);
+        realpath(opts.prefix, prefix);
+        unsigned long int size = strlen(prefix) + 1;
+        opts.prefix = malloc(size);
+        memset((void *)opts.prefix, 0, size);
+        memcpy((void *)opts.prefix, prefix, size);
+    }
+
+    ccInit(PACKAGE_CACHE_TIME);
+
+    pkgOpts.skipCache = opts.skipCache;
+    pkgOpts.prefix = opts.prefix;
+    pkgOpts.global = opts.global;
+    pkgOpts.force = opts.force;
+    pkgOpts.token = opts.token;
+
+#ifdef PTHREADS_HEADER
+    pkgOpts.concurrency = opts.concurrency;
+#endif
+
+    setPkgOptions(pkgOpts);
+
+    if (opts.prefix)
+    {
+        setenv("CPM_PREFIX", opts.prefix, 1);
+        setenv("PREFIX", opts.prefix, 1);
+    }
+
+    if (opts.force)
+        setenv("FORCE", "1", 1);
+
+    int code = program.argc == 0 ? installLocalpkgs() : installPackages(program.argc, program.argv);
+
+    curl_global_cleanup();
+    cleanPkgs();
+    command_free(&program);
+    return code;
+}
+
 static void setDir(command_t *self)
 {
     opts.dir = (char *)self->arg;
@@ -54,17 +154,6 @@ static void setGlobal(command_t *self)
     opts.global = 1;
     debug(&debugger, "set global flag");
 }
-
-#ifdef PTHREADS_HEADER
-static void setConcurrency(command_t *self)
-{
-    if (self->arg)
-    {
-        opts.concurrency = atol(self->arg);
-        debug(&debugger, "set concurrency: %lu", opts.concurrency);
-    }
-}
-#endif
 
 static void setSkipCache(command_t *self)
 {
@@ -245,93 +334,4 @@ static int installPackages(int n, char **pkgs)
     }
 
     return 0;
-}
-
-int main(int argc, char **argv)
-{
-    long pathMax;
-#ifdef _WIN32
-    opts.dir = ".\\deps";
-#else
-    opts.dir = "./deps";
-#endif
-
-    opts.verbose = 1;
-    opts.dev = 0;
-
-#ifdef PATH_MAX
-    pathMax = PATH_MAX;
-#elif defined(_PC_PATH_MAX)
-    pathMax = pathconf(opts.dir, _PC_PATH_MAX);
-#else
-    pathMax = 4096;
-#endif
-
-    debug_init(&debugger, "install");
-    ccInit(PACKAGE_CACHE_TIME);
-
-    command_t program;
-    command_init(&program, "intall", VERSION);
-    program.usage = "[options] [name <>]";
-
-    command_option(&program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
-    command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
-    command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
-    command_option(&program, "-d", "--dev", "install develmopent dependency", setDev);
-    command_option(&program, "-S", "--save", "Save dependency in manifest.json", setSave);
-    command_option(&program, "-D", "--save-dev", "Save develmopent dependency to manifest.json", setSaveDev);
-    command_option(&program, "-f", "--force", "Force the action", setForce);
-    command_option(&program, "-c", "--skip-cache", "Skip cache when installing", setSkipCache);
-    command_option(&program, "-g", "--global", "Global install", setGlobal);
-    command_option(&program, "-t", "--token <token>", "Set access token", setToken);
-#ifdef PTHREADS_HEADER
-    command_option(&program, "-C", "--concurrency <number>", "Set concurrency", setConcurrency);
-#endif
-    command_parse(&program, argc, argv);
-
-    debug(&debugger, "%d arguments", program.argc);
-
-    if (curl_global_init(CURL_GLOBAL_ALL) != 0)
-        logger_error("error", "Failed to initialize cURL");
-
-    if (opts.prefix)
-    {
-        char prefix[pathMax];
-        memset(prefix, 0, pathMax);
-        realpath(opts.prefix, prefix);
-        unsigned long int size = strlen(prefix) + 1;
-        opts.prefix = malloc(size);
-        memset((void *)opts.prefix, 0, size);
-        memcpy((void *)opts.prefix, prefix, size);
-    }
-
-    ccInit(PACKAGE_CACHE_TIME);
-
-    pkgOpts.skipCache = opts.skipCache;
-    pkgOpts.prefix = opts.prefix;
-    pkgOpts.global = opts.global;
-    pkgOpts.force = opts.force;
-    pkgOpts.token = opts.token;
-
-#ifdef PTHREADS_HEADER
-    pkgOpts.concurrency = opts.concurrency;
-#endif
-
-    setPkgOptions(pkgOpts);
-
-    if (opts.prefix)
-    {
-        setenv("CPM_PREFIX", opts.prefix, 1);
-        setenv("PREFIX", opts.prefix, 1);
-    }
-
-    if (opts.force)
-        setenv("FORCE", "1", 1);
-
-    int code = program.argc == 0 ? installLocalpkgs() : installPackages(program.argc, program.argv);
-
-    curl_global_cleanup();
-    cleanPkgs();
-    command_free(&program);
-    return code;
 }

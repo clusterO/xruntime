@@ -29,4 +29,12 @@ struct Options
     int verbose;
 };
 
+static void setOpts(command_t *cmd);
+static void setManifestOpts(command_t *cmd);
+static char *basePath();
+static void getInput(char *buffer, size_t s);
+static void readInput(JSON_Object *root, const char *key, const char *defaultValue, const char *output);
+static inline size_t writeManifest(const char *manifest, const char *str, size_t length);
+static int writePackages(const char *manifest, JSON_Value *pkg);
+
 #endif

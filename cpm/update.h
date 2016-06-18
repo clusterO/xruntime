@@ -6,6 +6,7 @@
 #include <string.h>
 #include <libgen.h>
 #include <curl/curl.h>
+
 #include "libs/debug.h"
 #include "libs/fs.h"
 #include "libs/http-get.h"
@@ -32,7 +33,8 @@
 
 debug_t debugger = {0};
 
-struct options {
+struct options
+{
     char const *dir;
     char *prefix;
     char *token;
@@ -42,5 +44,16 @@ struct options {
     unsigned int concurrency;
 #endif
 };
+
+static void setDir(command_t *self);
+static void setToken(command_t *self);
+static void setPrefix(command_t *self);
+static void unsetVerbose(command_t *self);
+static setDev(command_t *self);
+
+static int installLocalPackages();
+static int writeDeps(Package *pkg, char *prefix);
+static int installPackage(const char *slug);
+static int installPackages(int n, char **pkgs);
 
 #endif

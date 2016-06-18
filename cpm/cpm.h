@@ -37,7 +37,6 @@
 #define NOTIF_EXPIRATION 259200
 
 debug_t debugger;
-static const char *usage = "";
 
 #define format(...)                                         \
     ({                                                      \
@@ -48,5 +47,8 @@ static const char *usage = "";
             goto clean;                                     \
         }                                                   \
     })
+
+static bool checkRelease(const char *path);
+static void notifyNewRelease();
 
 #endif

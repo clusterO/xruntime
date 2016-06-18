@@ -2,6 +2,49 @@
 
 static struct Options opts;
 
+int main(int argc, char **argv)
+{
+    int exit = 0;
+    opts.verbose = 1;
+    opts.manifest = "manifest.json";
+
+    debug(&debugger, "init");
+    command_t program;
+    command_init(&program, "init", VERSION);
+    program.usage = "[options]";
+    command_option(&program, "-q", "--quiet", "disable verbose", setOpts);
+    command_option(&program, "-M", "--manifest <filename>", "name your manifest file. (default manifest.json)", setManifestOpts);
+    command_parse(&program, argc, argv);
+
+    debug(&debugger, "%d arguments", program.argc);
+
+    JSON_Value *json = json_value_init_object();
+    JSON_Object *root = json_object(json);
+
+    char *basepath = basePath();
+    char *pkgName = NULL;
+
+    int rc = asprintf(&pkgName, "package name (%s): ", basepath);
+    if (rc == -1)
+    {
+        logger_error("error", "asprintf() out of memory");
+        goto finish;
+    }
+
+    readInput(root, "name", basepath, pkgName);
+    readInput(root, "version", "0.1.0", "version (default: 0.1.0): ");
+
+    exit = writePackages(opts.manifest, json);
+
+finish:
+    free(pkgName);
+    free(basepath);
+    json_value_free(json);
+    command_free(&program);
+
+    return exit;
+}
+
 static void setOpts(command_t *cmd)
 {
     opts.verbose = 0;
@@ -77,47 +120,4 @@ clean:
     json_free_serialized_string(package);
 
     return rc;
-}
-
-int main(int argc, char **argv)
-{
-    int exit = 0;
-    opts.verbose = 1;
-    opts.manifest = "manifest.json";
-
-    debug(&debugger, "init");
-    command_t program;
-    command_init(&program, "init", VERSION);
-    program.usage = "[options]";
-    command_option(&program, "-q", "--quiet", "disable verbose", setOpts);
-    command_option(&program, "-M", "--manifest <filename>", "name your manifest file. (default manifest.json)", setManifestOpts);
-    command_parse(&program, argc, argv);
-
-    debug(&debugger, "%d arguments", program.argc);
-
-    JSON_Value *json = json_value_init_object();
-    JSON_Object *root = json_object(json);
-
-    char *basepath = basePath();
-    char *pkgName = NULL;
-
-    int rc = asprintf(&pkgName, "package name (%s): ", basepath);
-    if (rc == -1)
-    {
-        logger_error("error", "asprintf() out of memory");
-        goto finish;
-    }
-
-    readInput(root, "name", basepath, pkgName);
-    readInput(root, "version", "0.1.0", "version (default: 0.1.0): ");
-
-    exit = writePackages(opts.manifest, json);
-
-finish:
-    free(pkgName);
-    free(basepath);
-    json_value_free(json);
-    command_free(&program);
-
-    return exit;
 }

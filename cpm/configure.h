@@ -57,4 +57,15 @@ struct options
 #endif
 };
 
+static void setCache(command_t *self);
+static void setDev(command_t *self);
+static void setForce(command_t *self);
+static void setGlobal(command_t *self);
+static void setFlags(command_t *self);
+static void setPrefix(command_t *self);
+static void setDir(command_t *self);
+static void unsetVerbose(command_t *self);
+
+int configurePackage(const char *dir);
+
 #endif

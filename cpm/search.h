@@ -48,4 +48,12 @@ debug_t debugger;
             }                           \
     }
 
+static void unsetColor();
+static void unsetCache();
+static void setJson();
+static int matches(int count, char *args[], wiki_package_t *pkg);
+static char *cacheSearch();
+static void showPkg(const wiki_package_t *pkg, cc_color_t highlightColor, cc_color_t textColor);
+static void addPkgToJson(const wiki_package_t *pkg, JSON_Array *jsonList);
+
 #endif

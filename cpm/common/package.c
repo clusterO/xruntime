@@ -1,62 +1,6 @@
 #include "package.h"
-#include "cache.h"
-
-#include <curl/curl.h>
-#include <libgen.h>
-#include <limits.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <pthread.h>
-
-#include "../libs/hash.h"
-#include "../libs/logger.h"
-#include "../libs/parson.h"
-#include "../libs/asprintf.h"
-#include "../libs/http-get.h"
-#include "../libs/debug.h"
-#include "../libs/path-join.h"
-#include "../libs/parse-repo.h"
-#include "../libs/tempdir.h"
-
-#ifndef VERSION
-#define VERSION "master"
-#endif
-
-#ifndef OWNER
-#define OWNER "cpm"
-#endif
-
-#define GITHUB_RAW_CONTENT_URL "https://raw.githubusercontent.com/"
-#define GITHUB_RAW_CONTENT_AUTH_URL "https://%s@raw.githubusercontent.com/"
-
-#if defined(_WIN32) || defined(WIN32) || defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
-#define setenv(n, v, o) _putenv_s(n, v)
-#define realpath(fn, rn) _fullpath(fn, rn, strlen(fn))
-#endif
 
 static hash_t *visitedPackages = 0;
-
-typedef struct Thread Thread;
-struct Thread
-{
-    Package *pkg;
-    const char *dir;
-    char *file;
-    int verbose;
-    pthread_t thread;
-    pthread_attr_t attr;
-    void *data;
-};
-
-typedef struct Lock Lock;
-struct Lock
-{
-    pthread_mutex_t mutex;
-};
-
 static Lock lock = {PTHREAD_MUTEX_INITIALIZER};
 
 CURLSH *cpcs;

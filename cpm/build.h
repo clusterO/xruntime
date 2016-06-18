@@ -43,7 +43,8 @@
 #define realpath(p, rp) _fullpath(p, rp, strlen(p))
 #endif
 
-struct options {
+struct options
+{
     const char *dir;
     char *prefix;
     int force;
@@ -57,5 +58,17 @@ struct options {
     unsigned int concurrency;
 #endif
 };
+
+static void setCache(command_t *self);
+static void setDev(command_t *self);
+static void setForce(command_t *self);
+static void setGlobal(command_t *self);
+static void setClean(command_t *self);
+static void setTest(command_t *self);
+static void setPrefix(command_t *self);
+static void setDir(command_t *self);
+static void unsetVerbose(command_t *self);
+
+int buildPackage(const char *dir);
 
 #endif

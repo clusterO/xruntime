@@ -35,7 +35,8 @@ extern CURLSH *cpcs;
 
 debug_t debugger = {0};
 
-struct options {
+struct options
+{
     const char *dir;
     char *prefix;
     char *token;
@@ -50,5 +51,23 @@ struct options {
     unsigned int concurrency;
 #endif
 };
+
+static void setDir(command_t *self);
+static void setPrefix(command_t *self);
+static void setToken(command_t *self);
+static void unsetVerbose(command_t *self);
+static void setDev(command_t *self);
+static void setSave(command_t *self);
+static void setSaveDev(command_t *self);
+static void setForce(command_t *self);
+static void setGlobal(command_t *self);
+static void setSkipCache(command_t *self);
+
+static int installLocalpkgs();
+static int writeDeps(Package *pkg, char *prefix);
+static int saveDeps(Package *pkg);
+static int saveDevDeps(Package *pkg);
+static int installPackage(const char *slug);
+static int installPackages(int n, char **pkgs);
 
 #endif

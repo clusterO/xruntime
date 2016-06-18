@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <libgen.h>
 #include <curl/curl.h>
+
 #include "libs/asprintf.h"
 #include "libs/fs.h"
 #include "libs/http-get.h"
@@ -35,7 +36,8 @@ extern CURLSH *cpcs;
 
 debug_t debugger = {0};
 
-struct options {
+struct options
+{
     char *prefix;
     char *token;
     char *slug;
@@ -47,5 +49,14 @@ struct options {
     unsigned int concurrency;
 #endif
 };
+
+static void setSlug(command_t *self);
+static void setTag(command_t *self);
+static void setPrefix(command_t *self);
+static void setToken(command_t *self);
+static void unsetVerbose(command_t *self);
+static void setForce(command_t *self);
+
+static int installPackage(const char *slug);
 
 #endif

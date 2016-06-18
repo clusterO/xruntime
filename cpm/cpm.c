@@ -1,74 +1,6 @@
 #include "cpm.h"
 
-static bool checkRelease(const char *path)
-{
-    fs_stats *stats = fs_stat(path);
-    if (!stats)
-        return true;
-
-    time_t modified = stats->st_mtime;
-    time_t now = time(NULL);
-    free(stats);
-
-    return now - modified >= NOTIF_EXPIRATION;
-}
-
-static void compareVersions(const JSON_Object *res, const char *marker)
-{
-    const char *latestVersion = json_object_get_string(res, "tag");
-
-    if (strcmp(VERSION, latestVersion) != 0)
-        logger_info("info", "New version is available. use upgrade --tag %s", latestVersion);
-}
-
-static void notifyNewRelease()
-{
-    const char *marker = path_join(ccMetaPath(), "Notification checked");
-
-    if (!marker)
-    {
-        fs_write(marker, " ");
-        return;
-    }
-
-    if (!checkRelease(marker))
-    {
-        debug(&debugger, "All OK");
-        return;
-    }
-
-    JSON_Value *json = NULL;
-    JSON_Object *jsonObj = NULL;
-
-    http_get_response_t *res = http_get(LATEST_RELEASE_URL);
-
-    if (!res->ok)
-    {
-        debug(&debugger, "Failed to check for release");
-        goto clean;
-    }
-
-    if (!(json = json_parse_string(res->data)))
-    {
-        debug(&debugger, "Unable to parse json response");
-        goto clean;
-    }
-
-    if (!(jsonObj = json_value_get_object(json)))
-    {
-        debug(&debugger, "Unable to parse json object");
-        goto clean;
-    }
-
-    compareVersions(jsonObj, marker);
-    fs_write(marker, " ");
-
-clean:
-    if (json)
-        json_value_free(json);
-    free((void *)marker);
-    http_get_free(res);
-}
+static const char *usage = "";
 
 int main(int argc, char **argv)
 {
@@ -184,4 +116,74 @@ clean:
     free(commandArgs);
     free(bin);
     return rc;
+}
+
+static bool checkRelease(const char *path)
+{
+    fs_stats *stats = fs_stat(path);
+    if (!stats)
+        return true;
+
+    time_t modified = stats->st_mtime;
+    time_t now = time(NULL);
+    free(stats);
+
+    return now - modified >= NOTIF_EXPIRATION;
+}
+
+static void compareVersions(const JSON_Object *res, const char *marker)
+{
+    const char *latestVersion = json_object_get_string(res, "tag");
+
+    if (strcmp(VERSION, latestVersion) != 0)
+        logger_info("info", "New version is available. use upgrade --tag %s", latestVersion);
+}
+
+static void notifyNewRelease()
+{
+    const char *marker = path_join(ccMetaPath(), "Notification checked");
+
+    if (!marker)
+    {
+        fs_write(marker, " ");
+        return;
+    }
+
+    if (!checkRelease(marker))
+    {
+        debug(&debugger, "All OK");
+        return;
+    }
+
+    JSON_Value *json = NULL;
+    JSON_Object *jsonObj = NULL;
+
+    http_get_response_t *res = http_get(LATEST_RELEASE_URL);
+
+    if (!res->ok)
+    {
+        debug(&debugger, "Failed to check for release");
+        goto clean;
+    }
+
+    if (!(json = json_parse_string(res->data)))
+    {
+        debug(&debugger, "Unable to parse json response");
+        goto clean;
+    }
+
+    if (!(jsonObj = json_value_get_object(json)))
+    {
+        debug(&debugger, "Unable to parse json object");
+        goto clean;
+    }
+
+    compareVersions(jsonObj, marker);
+    fs_write(marker, " ");
+
+clean:
+    if (json)
+        json_value_free(json);
+    free((void *)marker);
+    http_get_free(res);
 }

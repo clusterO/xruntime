@@ -4,36 +4,6 @@ static struct options opts = {0};
 static Options pkgOpts = {0};
 static Package *rootPkg = NULL;
 
-static void setDir(command_t *self)
-{
-    opts.dir = (char *)self->arg;
-    debug(&debugger, "set dir: %s", opts.dir);
-}
-
-static void setToken(command_t *self)
-{
-    opts.token = (char *)self->arg;
-    debug(&debugger, "set token: %s", opts.token);
-}
-
-static void setPrefix(command_t *self)
-{
-    opts.prefix = (char *)self->arg;
-    debug(&debugger, "set prefix: %s", opts.prefix);
-}
-
-static void unsetVerbose(command_t *self)
-{
-    opts.verbose = 0;
-    debug(&debugger, "unset verbose");
-}
-
-static setDev(command_t *self)
-{
-    opts.dev = 1;
-    debug(&debugger, "set development flag");
-}
-
 #ifdef PTHREADS_HEADER
 static void setConcurrency(command_t *self)
 {
@@ -44,6 +14,89 @@ static void setConcurrency(command_t *self)
     }
 }
 #endif
+
+int main(int argc, char **argv)
+{
+    long pathMax;
+
+#ifdef _WIN32
+    opts.dir = ".\\deps";
+#else
+    opts.dir = "./deps";
+#endif
+    opts.verbose = 1;
+    opts.dev = 0;
+
+#ifdef PATH_MAX
+    pathMax = PATH_MAX;
+#elif
+    pathMax = pathconf(opts.dir, _PC_PATH_MAX);
+#else
+    pathMax = 4096;
+#endif
+
+    debug_init(&debugger, "update");
+    ccInit(PACKAGE_CACHE_TIME);
+
+    command_t program;
+    command_init(&program, "update", VERSION);
+    program.usage = "[options] [name <>]";
+
+    command_option(&program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
+    command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
+    command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
+    command_option(&program, "-d", "--dev", "Install development dependencies", setDev);
+    command_option(&program, "-t", "--token <token>", "Set access token", setToken);
+#ifdef PTHREADS_HEADER
+    command_option(&program, "-C", "--concurrency", "Set concurrency <number>", setConcurrency);
+#endif
+    command_parse(&program, argc, argv);
+
+    debug(&debugger, "%d arguments", program.argc);
+
+    if (curl_global_init(CURL_GLOBAL_ALL) != 0)
+        logger_error("error", "Failed to init cURL");
+
+    if (opts.prefix)
+    {
+        char prefix[pathMax];
+        memset(prefix, 0, pathMax);
+        realpath(opts.prefix, prefix);
+        unsigned long int size = strlen(prefix) + 1;
+        opts.prefix = malloc(size);
+        memset((void *)opts.prefix, 0, size);
+        memcpy((void *)opts.prefix, prefix, size);
+    }
+
+    ccInit(PACKAGE_CACHE_TIME);
+
+    pkgOpts.skipCache = 1;
+    pkgOpts.prefix = opts.prefix;
+    pkgOpts.global = 0;
+    pkgOpts.force = 1;
+    pkgOpts.token = opts.token;
+
+#ifdef PTHREADS_HEADER
+    pkgOpts.concurrency = opts.concurrency;
+#endif
+
+    setPkgOptions(pkgOpts);
+
+    if (opts.prefix)
+    {
+        setenv("CPM_PREFIX", opts.prefix, 1);
+        setenv("PREFIX", opts.prefix, 1);
+    }
+
+    setenv("FORCE", "1", 1);
+
+    int code = program.argc == 0 ? installLocalPackages() : installPackages(program.argc, program.argv);
+
+    curl_global_cleanup();
+    cleanPkgs();
+    command_free(&program);
+    return code;
+}
 
 static int installLocalPackages()
 {
@@ -204,85 +257,32 @@ static int installPackages(int n, char **pkgs)
     return 0;
 }
 
-int main(int argc, char **argv)
+static void setDir(command_t *self)
 {
-    long pathMax;
+    opts.dir = (char *)self->arg;
+    debug(&debugger, "set dir: %s", opts.dir);
+}
 
-#ifdef _WIN32
-    opts.dir = ".\\deps";
-#else
-    opts.dir = "./deps";
-#endif
-    opts.verbose = 1;
-    opts.dev = 0;
+static void setToken(command_t *self)
+{
+    opts.token = (char *)self->arg;
+    debug(&debugger, "set token: %s", opts.token);
+}
 
-#ifdef PATH_MAX
-    pathMax = PATH_MAX;
-#elif
-    pathMax = pathconf(opts.dir, _PC_PATH_MAX);
-#else
-    pathMax = 4096;
-#endif
+static void setPrefix(command_t *self)
+{
+    opts.prefix = (char *)self->arg;
+    debug(&debugger, "set prefix: %s", opts.prefix);
+}
 
-    debug_init(&debugger, "update");
-    ccInit(PACKAGE_CACHE_TIME);
+static void unsetVerbose(command_t *self)
+{
+    opts.verbose = 0;
+    debug(&debugger, "unset verbose");
+}
 
-    command_t program;
-    command_init(&program, "update", VERSION);
-    program.usage = "[options] [name <>]";
-
-    command_option(&program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
-    command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
-    command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
-    command_option(&program, "-d", "--dev", "Install development dependencies", setDev);
-    command_option(&program, "-t", "--token <token>", "Set access token", setToken);
-#ifdef PTHREADS_HEADER
-    command_option(&program, "-C", "--concurrency", "Set concurrency <number>", setConcurrency);
-#endif
-    command_parse(&program, argc, argv);
-
-    debug(&debugger, "%d arguments", program.argc);
-
-    if (curl_global_init(CURL_GLOBAL_ALL) != 0)
-        logger_error("error", "Failed to init cURL");
-
-    if (opts.prefix)
-    {
-        char prefix[pathMax];
-        memset(prefix, 0, pathMax);
-        realpath(opts.prefix, prefix);
-        unsigned long int size = strlen(prefix) + 1;
-        opts.prefix = malloc(size);
-        memset((void *)opts.prefix, 0, size);
-        memcpy((void *)opts.prefix, prefix, size);
-    }
-
-    ccInit(PACKAGE_CACHE_TIME);
-
-    pkgOpts.skipCache = 1;
-    pkgOpts.prefix = opts.prefix;
-    pkgOpts.global = 0;
-    pkgOpts.force = 1;
-    pkgOpts.token = opts.token;
-
-#ifdef PTHREADS_HEADER
-    pkgOpts.concurrency = opts.concurrency;
-#endif
-
-    setPkgOptions(pkgOpts);
-
-    if (opts.prefix)
-    {
-        setenv("CPM_PREFIX", opts.prefix, 1);
-        setenv("PREFIX", opts.prefix, 1);
-    }
-
-    setenv("FORCE", "1", 1);
-
-    int code = program.argc == 0 ? installLocalPackages() : installPackages(program.argc, program.argv);
-
-    curl_global_cleanup();
-    cleanPkgs();
-    command_free(&program);
-    return code;
+static setDev(command_t *self)
+{
+    opts.dev = 1;
+    debug(&debugger, "set development flag");
 }
