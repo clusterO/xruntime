@@ -1,10 +1,8 @@
 #include "cpm.h"
 
-static const char *usage = "";
-
 int main(int argc, char **argv)
 {
-    char *cmd = NULL;
+    char *cmd = argv[1];
     char *args = NULL;
     char *command = NULL;
     char *commandArgs = NULL;
@@ -12,34 +10,37 @@ int main(int argc, char **argv)
     int rc = 1;
 
     debug_init(&debugger, "cmp");
-    ccInit();
-    notifyNewRelease();
 
-    if (argv[1] == NULL || strncmp(argv[1], "-h", 2) == 0 || strncmp(argv[1], "--help", 6) == 0)
+    ccInit();           // initialize the cache path
+    notifyNewRelease(); // check if there is new versions
+
+#pragma region refactor command selector
+
+    if (cmd == NULL)
     {
         printf("%s\n", usage);
         return 0;
     }
 
-    if (strncmp(argv[1], "-v", 2) == 0)
+    if (strncmp(cmd, "-v", 2) == 0)
     {
         fprintf(stderr, "Deprecated flag: \"-v\". Please use \"-V\"\n");
-        argv[1] = "-V";
+        cmd = "-V";
     }
 
-    if (strncmp(argv[1], "-V", 2) == 0 || strncmp(argv[1], "--version", 9) == 0)
+    if (strncmp(cmd, "-V", 2) == 0 || strncmp(cmd, "--version", 9) == 0)
     {
         printf("%s\n", VERSION);
         return 0;
     }
 
-    if (strncmp(argv[1], "--", 2) == 0)
+    if (strncmp(cmd, "--", 2) == 0)
     {
-        fprintf(stderr, "Unknown option: \"%s\"\n", argv[1]);
+        fprintf(stderr, "Unknown option: \"%s\"\n", cmd);
         return 1;
     }
 
-    cmd = strdup(argv[1]);
+    cmd = strdup(cmd);
     if (cmd == NULL)
     {
         fprintf(stderr, "Failed to allocate memory");
@@ -48,7 +49,7 @@ int main(int argc, char **argv)
 
     cmd = trim(cmd);
 
-    if (strcmp(cmd, "help") == 0)
+    if (strcmp(cmd, "help") == 0 || strcmp(cmd, "-h") == 0 || strcmp(cmd, "--help") == 0)
     {
         if (argc >= 3)
         {
@@ -74,24 +75,30 @@ int main(int argc, char **argv)
 
     debug(&debugger, "args: %s", args);
 
+#pragma endregion
+
+#pragma region refactor command executer
+
     cmd = strcmp(cmd, "i") == 0 ? strdup("install") : cmd;
     cmd = strcmp(cmd, "up") == 0 ? strdup("update") : cmd;
 
+#pragma region This generate command from /usr/bin
 #ifdef _WIN32
     format(&command, "cpm-%s.exe", cmd);
 #else
-    format(&command, "cpm-%s", cmd);
+    format(&command, "%s", cmd);
 #endif
+
     debug(&debugger, "command '%s'", cmd);
 
-    bin = which(command);
+    bin = which(command); // check against getenv("PATH")
     if (bin == NULL)
     {
         fprintf(stderr, "Unsupported command \"%s\"\n", cmd);
         goto clean;
     }
 
-#ifdef _WIN32
+#ifdef _WIN32 // should move before which
     for (char *p = bin; *p; p++)
         if (*p == '/')
             *p = '\\';
@@ -104,10 +111,21 @@ int main(int argc, char **argv)
 
     debug(&debugger, "exec: %s", commandArgs);
 
-    rc = system(commandArgs);
+#pragma endregion
+
+    // we are calling here the command from our compilation fodler
+    char buffer[1024];
+    snprintf(buffer, sizeof(buffer), "cd $PWD; ./%s;", cmd);
+    rc = system(buffer);
+    if (WIFSIGNALED(rc) && (WTERMSIG(rc) == SIGINT || WTERMSIG(rc) == SIGQUIT))
+        exit(-1);
+
     debug(&debugger, "returned %d", rc);
+
     if (rc > 255)
         rc = 1;
+
+#pragma endregion
 
 clean:
     free(cmd);
@@ -141,7 +159,7 @@ static void compareVersions(const JSON_Object *res, const char *marker)
 
 static void notifyNewRelease()
 {
-    const char *marker = path_join(ccMetaPath(), "Notification checked");
+    const char *marker = path_join(ccMetaPath(), "Notification checked"); // ccMetaPath get the cache path
 
     if (!marker)
     {

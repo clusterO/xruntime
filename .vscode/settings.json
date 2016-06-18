@@ -58,6 +58,12 @@
     "hashtable.h": "c",
     "request.h": "c",
     "mime.h": "c",
-    "server.h": "c"
+    "server.h": "c",
+    "configure.h": "c",
+    "cache.h": "c",
+    "curl.h": "c",
+    "time.h": "c",
+    "http-get.h": "c",
+    "package.h": "c"
   }
 }

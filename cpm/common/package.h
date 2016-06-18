@@ -1,28 +1,6 @@
 #ifndef CPM_PACKAGE_HEADER
 #define CPM_PACKAGE_HEADER
 
-#include <curl/curl.h>
-#include <libgen.h>
-#include <limits.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <pthread.h>
-
-#include "../libs/list.h"
-#include "../libs/hash.h"
-#include "../libs/logger.h"
-#include "../libs/parson.h"
-#include "../libs/asprintf.h"
-#include "../libs/http-get.h"
-#include "../libs/debug.h"
-#include "../libs/path-join.h"
-#include "../libs/parse-repo.h"
-#include "../libs/tempdir.h"
-#include "cache.h"
-
 #ifndef VERSION
 #define VERSION "master"
 #endif
@@ -39,30 +17,41 @@
 #define realpath(fn, rn) _fullpath(fn, rn, strlen(fn))
 #endif
 
-typedef struct Thread Thread;
-struct Thread
-{
-    Package *pkg;
-    const char *dir;
-    char *file;
-    int verbose;
-    pthread_t thread;
-    pthread_attr_t attr;
-    void *data;
-};
+#define _debug(...)                            \
+    ({                                         \
+        if (!(_debugger.name))                 \
+            debug_init(&_debugger, "package"); \
+        debug(&_debugger, __VA_ARGS__);        \
+    })
 
-typedef struct Lock Lock;
-struct Lock
-{
-    pthread_mutex_t mutex;
-};
+#define E_FORMAT(...)               \
+    ({                              \
+        rc = asprintf(__VA_ARGS__); \
+        if (rc == -1)               \
+            goto clean;             \
+    })
 
-typedef struct
-{
-    char *name;
-    char *author;
-    char *version;
-} Dependency;
+#include <curl/curl.h>
+#include <libgen.h>
+#include <limits.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <pthread.h>
+
+#include "cache.h"
+#include "../libs/list.h"
+#include "../libs/hash.h"
+#include "../libs/logger.h"
+#include "../libs/parson.h"
+#include "../libs/asprintf.h"
+#include "../libs/http-get.h"
+#include "../libs/debug.h"
+#include "../libs/path-join.h"
+#include "../libs/parse-repo.h"
+#include "../libs/tempdir.h"
 
 typedef struct
 {
@@ -90,6 +79,29 @@ typedef struct
 
 typedef struct
 {
+    Package *pkg;
+    const char *dir;
+    char *file;
+    int verbose;
+    pthread_t thread;
+    pthread_attr_t attr;
+    void *data;
+} Thread;
+
+typedef struct
+{
+    pthread_mutex_t mutex;
+} Lock;
+
+typedef struct
+{
+    char *name;
+    char *author;
+    char *version;
+} Dependency;
+
+typedef struct
+{
     int skipCache;
     int force;
     int global;
@@ -98,7 +110,17 @@ typedef struct
     char *token;
 } Options;
 
-CURLSH *cpcs;
+static inline char *json_object_get_string_safe(JSON_Object *obj, const char *key);
+static inline char *json_array_get_string_safe(JSON_Array *arr, const char *i);
+static inline char buildFileUrl(const char *url, const char *file);
+static inline char *buildSlug(const char *author, const char *name, const char *version);
+static inline char *buildRepo(const char *author, const char *name);
+static inline list_t *parseDependencies(JSON_Object *json);
+static inline int install(list_t *list, const char *dir, int verbose);
+static int fetchFile(Package *pkg, const char *dir, char *file, int verbose);
+static void *fetchThreadFile(void *arg);
+static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void **data);
+static Package *pkgSlug(const char *slug, int verbose, const char *file);
 
 extern void setPkgOptions(Options);
 extern Package *newPkg(const char *, int);
