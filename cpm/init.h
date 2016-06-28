@@ -1,17 +1,6 @@
 #ifndef _INIT_HEADER_
 #define _INIT_HEADER_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include "libs/asprintf.h"
-#include "libs/logger.h"
-#include "libs/debug.h"
-#include "libs/commander.h"
-#include "libs/parson.h"
-#include "common/package.h"
-
 #ifndef VERSION
 #define VERSION "0.1.0"
 #endif
@@ -21,13 +10,25 @@
 #define realpath(p, rp) _fullpath(p, rp, strlen(p))
 #endif
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "libs/asprintf.h"
+#include "libs/logger.h"
+#include "libs/debug.h"
+#include "libs/commander.h"
+#include "libs/parson.h"
+#include "common/package.h"
+
 debug_t debugger;
 
-struct Options
+typedef struct
 {
     char *manifest;
     int verbose;
-};
+} InitOptions;
 
 static void setOpts(command_t *cmd);
 static void setManifestOpts(command_t *cmd);

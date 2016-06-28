@@ -20,7 +20,6 @@ static void setConcurrency(command_t *self)
 
 int main(int argc, char **argv)
 {
-    printf("----- hit");
     long pathMax;
 
 #ifdef _WIN32
@@ -113,6 +112,7 @@ int main(int argc, char **argv)
 
 static int installLocalpkgs()
 {
+    // this file lives in the output folder, should be moved to the actual project folder
     const char *file = "manifest.json";
 
     if (fs_exists(file) == -1)
