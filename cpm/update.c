@@ -1,43 +1,34 @@
 #include "update.h"
 
-static struct options opts = {0};
-static Options pkgOpts = {0};
-static Package *rootPkg = NULL;
-
-#ifdef PTHREADS_HEADER
-static void setConcurrency(command_t *self)
-{
-    if (self->arg)
-    {
-        opts.concurrency = atol(self->arg);
-        debug(&debugger, "set concurrency: %lu", opts.concurrency);
-    }
-}
-#endif
+static UpdateOptions options = {0};
+static Options packageOptions = {0};
+static Package *rootPackage = NULL;
 
 int main(int argc, char **argv)
 {
     long pathMax;
 
 #ifdef _WIN32
-    opts.dir = ".\\deps";
+    options.dir = ".\\deps";
 #else
-    opts.dir = "./deps";
+    options.dir = "./deps";
 #endif
-    opts.verbose = 1;
-    opts.dev = 0;
+    options.verbose = 1;
+    options.dev = 0;
 
 #ifdef PATH_MAX
     pathMax = PATH_MAX;
 #elif
-    pathMax = pathconf(opts.dir, _PC_PATH_MAX);
+    pathMax = pathconf(options.dir, _PC_PATH_MAX);
 #else
     pathMax = 4096;
 #endif
 
     debug_init(&debugger, "update");
+
     ccInit(PACKAGE_CACHE_TIME);
 
+    // move to commander
     command_t program;
     command_init(&program, "update", VERSION);
     program.usage = "[options] [name <>]";
@@ -47,6 +38,7 @@ int main(int argc, char **argv)
     command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
     command_option(&program, "-d", "--dev", "Install development dependencies", setDev);
     command_option(&program, "-t", "--token <token>", "Set access token", setToken);
+
 #ifdef PTHREADS_HEADER
     command_option(&program, "-C", "--concurrency", "Set concurrency <number>", setConcurrency);
 #endif
@@ -57,35 +49,36 @@ int main(int argc, char **argv)
     if (curl_global_init(CURL_GLOBAL_ALL) != 0)
         logger_error("error", "Failed to init cURL");
 
-    if (opts.prefix)
+    // DRY
+    if (options.prefix)
     {
         char prefix[pathMax];
         memset(prefix, 0, pathMax);
-        realpath(opts.prefix, prefix);
+        realpath(options.prefix, prefix);
         unsigned long int size = strlen(prefix) + 1;
-        opts.prefix = malloc(size);
-        memset((void *)opts.prefix, 0, size);
-        memcpy((void *)opts.prefix, prefix, size);
+        options.prefix = malloc(size);
+        memset((void *)options.prefix, 0, size);
+        memcpy((void *)options.prefix, prefix, size);
     }
 
     ccInit(PACKAGE_CACHE_TIME);
 
-    pkgOpts.skipCache = 1;
-    pkgOpts.prefix = opts.prefix;
-    pkgOpts.global = 0;
-    pkgOpts.force = 1;
-    pkgOpts.token = opts.token;
+    packageOptions.skipCache = 1;
+    packageOptions.prefix = options.prefix;
+    packageOptions.global = 0;
+    packageOptions.force = 1;
+    packageOptions.token = options.token;
 
 #ifdef PTHREADS_HEADER
-    pkgOpts.concurrency = opts.concurrency;
+    packageOptions.concurrency = options.concurrency;
 #endif
 
-    setPkgOptions(pkgOpts);
+    setPkgOptions(packageOptions);
 
-    if (opts.prefix)
+    if (options.prefix)
     {
-        setenv("CPM_PREFIX", opts.prefix, 1);
-        setenv("PREFIX", opts.prefix, 1);
+        setenv("CPM_PREFIX", options.prefix, 1);
+        setenv("PREFIX", options.prefix, 1);
     }
 
     setenv("FORCE", "1", 1);
@@ -98,6 +91,7 @@ int main(int argc, char **argv)
     return code;
 }
 
+// DRY installLocalpages, writeDeps, installPackage, installPackages
 static int installLocalPackages()
 {
     const char *file = "manifest.json";
@@ -113,19 +107,19 @@ static int installLocalPackages()
     if (json == NULL)
         return 1;
 
-    Package *pkg = newPkg(json, opts.verbose);
+    Package *pkg = newPkg(json, options.verbose);
     if (pkg == NULL)
         goto e1;
     if (pkg->prefix)
         setenv("PREFIX", pkg->prefix, 1);
 
-    int rc = installDeps(pkg, opts.dir, opts.verbose);
+    int rc = installDeps(pkg, options.dir, options.verbose);
     if (rc == -1)
         goto e2;
 
-    if (opts.dev)
+    if (options.dev)
     {
-        rc = installDev(pkg, opts.dir, opts.verbose);
+        rc = installDev(pkg, options.dir, options.verbose);
         if (rc == -1)
             goto e2;
     }
@@ -171,6 +165,7 @@ static int installPackage(const char *slug)
     Package *pkg = NULL;
     int rc;
     long pathMax;
+
 #ifdef PATH_MAX
     pathMax = PATH_MAX;
 #elif defined(_PC_PATH_MAX)
@@ -179,13 +174,13 @@ static int installPackage(const char *slug)
     pathMax = 4096;
 #endif
 
-    if (!rootPkg)
+    if (!rootPackage)
     {
         const char *name = "manifest.json";
         char *json = fs_read(name);
 
         if (json)
-            rootPkg = newPkg(json, opts.verbose);
+            rootPackage = newPkg(json, options.verbose);
     }
 
     if (slug[0] == '.')
@@ -215,24 +210,24 @@ static int installPackage(const char *slug)
     }
 
     if (!pkg)
-        pkg = newPkgSlug(slug, opts.verbose);
+        pkg = newPkgSlug(slug, options.verbose);
 
     if (pkg == NULL)
         return -1;
 
-    if (rootPkg && rootPkg->prefix)
+    if (rootPackage && rootPackage->prefix)
     {
-        pkgOpts.prefix = rootPkg->prefix;
-        setPkgOptions(pkgOpts);
+        packageOptions.prefix = rootPackage->prefix;
+        setPkgOptions(packageOptions);
     }
 
-    rc = installPkg(pkg, opts.dir, opts.verbose);
+    rc = installPkg(pkg, options.dir, options.verbose);
     if (rc != 0)
         goto clean;
 
-    if (rc == 0 && opts.dev)
+    if (rc == 0 && options.dev)
     {
-        rc = installDev(pkg, opts.dir, opts.verbose);
+        rc = installDev(pkg, options.dir, options.verbose);
         if (rc != 0)
             goto clean;
     }
@@ -259,30 +254,30 @@ static int installPackages(int n, char **pkgs)
 
 static void setDir(command_t *self)
 {
-    opts.dir = (char *)self->arg;
-    debug(&debugger, "set dir: %s", opts.dir);
+    options.dir = (char *)self->arg;
+    debug(&debugger, "set dir: %s", options.dir);
 }
 
 static void setToken(command_t *self)
 {
-    opts.token = (char *)self->arg;
-    debug(&debugger, "set token: %s", opts.token);
+    options.token = (char *)self->arg;
+    debug(&debugger, "set token: %s", options.token);
 }
 
 static void setPrefix(command_t *self)
 {
-    opts.prefix = (char *)self->arg;
-    debug(&debugger, "set prefix: %s", opts.prefix);
+    options.prefix = (char *)self->arg;
+    debug(&debugger, "set prefix: %s", options.prefix);
 }
 
 static void unsetVerbose(command_t *self)
 {
-    opts.verbose = 0;
+    options.verbose = 0;
     debug(&debugger, "unset verbose");
 }
 
-static setDev(command_t *self)
+static void setDev(command_t *self)
 {
-    opts.dev = 1;
+    options.dev = 1;
     debug(&debugger, "set development flag");
 }

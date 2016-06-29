@@ -2,7 +2,7 @@
 #define _INSTALL_HEADER_
 
 #ifndef VERSION
-#define VERSION "0.1.0"
+#define VERSION "1.0.0"
 #endif
 
 #ifdef PTHREADS_HEADER
@@ -59,10 +59,11 @@ static void setSaveDev(command_t *self);
 static void setForce(command_t *self);
 static void setGlobal(command_t *self);
 static void setSkipCache(command_t *self);
-static int writeDeps(Package *pkg, char *prefix);
-static int saveDeps(Package *pkg);
-static int saveDevDeps(Package *pkg);
-static int installLocalpkgs();
+static void getCommandOptions(command_t *program, int argc, char **argv);
+static int writeDependency(Package *pkg, char *prefix);
+static int saveDependency(Package *pkg);
+static int saveDevDependency(Package *pkg);
+static int installLocalPackages();
 static int installPackage(const char *slug);
 static int installPackages(int n, char **pkgs);
 

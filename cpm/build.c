@@ -1,14 +1,14 @@
 #include "build.h"
 
-Options pkgOpts = {0};
-Package *rootPkg = NULL;
+Options packageOptions = {0};
+Package *rootPackage = NULL;
 debug_t debugger = {0};
 hash_t *built = 0;
 char **argV = 0;
 int argC = 0;
 int offset = 0;
 
-struct options opts = {
+BuildOptions options = {
     .skipCache = 0,
     .verbose = 1,
     .force = 0,
@@ -23,42 +23,15 @@ struct options opts = {
 #endif
 };
 
-#ifdef PTHREADS_HEADER
-static void setConcurency(command_t *self)
-{
-    if (self->arg)
-    {
-        opts.concurrency = atol(self->arg);
-        debug(&debugger, "set concurrency: %lu", opts.concurrency);
-    }
-}
-#endif
-
-#ifdef PTHREADS_HEADER
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-
-struct Thread
-{
-    const char *dir;
-};
-
-void *buildPackageThread(void *arg)
-{
-    Thread *wrap = arg;
-    const char *dir = wrap->dir;
-    buildPackage(dir);
-    return 0;
-}
-#endif
-
 int main(int argc, char **argv)
 {
     int rc = 0;
     long pathMax;
+
 #ifdef PATH_MAX
     pathMax = PATH_MAX;
 #elif defined(_PC_PATH_MAX)
-    pathMax = pathconf(opts.dir, _PC_PATH_MAX);
+    pathMax = pathconf(options.dir, _PC_PATH_MAX);
 #else
     pathMax = 4096;
 #endif
@@ -71,6 +44,7 @@ int main(int argc, char **argv)
     built = hash_new();
     hash_set(built, strdup("__build__"), VERSION);
 
+    // to be moved to commander in commun
     command_t program;
     command_init(&program, "build", VERSION);
     debug_init(&debugger, "build");
@@ -86,32 +60,33 @@ int main(int argc, char **argv)
     command_option(&program, "-d", "--dev", "Build development dependencies", setDev);
     command_option(&program, "-f", "--force", "Force the action", setForce);
     command_option(&program, "-c", "--skip-cache", "Skip caching", setCache);
+
 #ifdef PTHREADS_HEADER
     command_option(&program, "-C", "--concurrency <number>", "Set concurrency", setConcurency);
 #endif
-
     command_parse(&program, argc, argv);
 
-    if (opts.dir)
+    // DRY - see configuration
+    if (options.dir)
     {
         char dir[pathMax];
         memset(dir, 0, pathMax);
-        realpath(opts.dir, dir);
+        realpath(options.dir, dir);
         unsigned long int size = strlen(dir) + 1;
-        opts.dir = malloc(size);
-        memset((void *)opts.dir, 0, size);
-        memcpy((void *)opts.dir, dir, size);
+        options.dir = malloc(size);
+        memset((void *)options.dir, 0, size);
+        memcpy((void *)options.dir, dir, size);
     }
 
-    if (opts.prefix)
+    if (options.prefix)
     {
         char prefix[pathMax];
         memset(prefix, 0, pathMax);
-        realpath(opts.prefix, prefix);
+        realpath(options.prefix, prefix);
         unsigned long int size = strlen(prefix) + 1;
-        opts.prefix = malloc(size);
-        memset((void *)opts.prefix, 0, size);
-        memcpy((void *)opts.prefix, prefix, size);
+        options.prefix = malloc(size);
+        memset((void *)options.prefix, 0, size);
+        memcpy((void *)options.prefix, prefix, size);
     }
 
     offset = program.argc;
@@ -154,20 +129,20 @@ int main(int argc, char **argv)
 
     ccInit(PACKAGE_CACHE_TIME);
 
-    pkgOpts.skipCache = opts.skipCache;
-    pkgOpts.prefix = opts.prefix;
-    pkgOpts.global = opts.global;
-    pkgOpts.force = opts.force;
+    packageOptions.skipCache = options.skipCache;
+    packageOptions.prefix = options.prefix;
+    packageOptions.global = options.global;
+    packageOptions.force = options.force;
 
-    setPkgOptions(pkgOpts);
+    setPkgOptions(packageOptions);
 
-    if (opts.prefix)
+    if (options.prefix)
     {
-        setenv("CPM_PREFIX", opts.prefix, 1);
-        setenv("PREFIX", opts.prefix, 1);
+        setenv("CPM_PREFIX", options.prefix, 1);
+        setenv("PREFIX", options.prefix, 1);
     }
 
-    if (opts.force)
+    if (options.force)
         setenv("FORCE", "1", 1);
 
     if (program.argc || (argc == offset + argC))
@@ -187,7 +162,7 @@ int main(int argc, char **argv)
             {
                 fs_stats *stats = fs_stat(dep);
                 if (!stats)
-                    dep = path_join(opts.dir, dep);
+                    dep = path_join(options.dir, dep);
                 else
                     free(stats);
             }
@@ -232,10 +207,10 @@ int main(int argc, char **argv)
     curl_global_cleanup();
     cleanPkgs();
 
-    if (opts.dir)
-        free((char *)opts.dir);
-    if (opts.prefix)
-        free(opts.prefix);
+    if (options.dir)
+        free((char *)options.dir);
+    if (options.prefix)
+        free(options.prefix);
 
     if (argC > 0)
     {
@@ -250,20 +225,20 @@ int main(int argc, char **argv)
         if (totalBuilt > 0)
             printf("\n");
 
-        if (opts.verbose)
+        if (options.verbose)
         {
             char *context = "";
-            if (opts.clean || opts.test)
+            if (options.clean || options.test)
             {
                 context = 0;
-                asprintf(&context, " (%s) ", opts.clean && opts.test ? "clean test" : opts.clean ? "clean"
-                                                                                                 : "test");
+                asprintf(&context, " (%s) ", options.clean && options.test ? "clean test" : options.clean ? "clean"
+                                                                                                          : "test");
             }
 
             if (totalBuilt > 1)
                 logger_info("info", "built %d packages%s", totalBuilt, context);
 
-            if (opts.clean || opts.test)
+            if (options.clean || options.test)
                 free(context);
         }
     }
@@ -279,6 +254,7 @@ int buildPackage(const char *dir)
     int ok = 0;
     int rc = 0;
     long pathMax;
+
 #ifdef PATH_MAX
     pathMax = PATH_MAX;
 #elif defined(_PC_PATH_MAX)
@@ -296,22 +272,22 @@ int buildPackage(const char *dir)
     pthread_mutex_lock(&mutex);
 #endif
 
-    if (!rootPkg)
+    if (!rootPackage)
     {
         char *json = fs_read(file);
         if (json)
-            rootPkg = newPkg(json, opts.verbose);
+            rootPackage = newPkg(json, options.verbose);
 
-        if (rootPkg && rootPkg->prefix)
+        if (rootPackage && rootPackage->prefix)
         {
             char prefix[pathMax];
             memset(prefix, 0, pathMax);
-            realpath(rootPkg->prefix, prefix);
+            realpath(rootPackage->prefix, prefix);
             unsigned long int size = strlen(prefix) + 1;
-            free(rootPkg->prefix);
-            rootPkg->prefix = malloc(size);
-            memset((void *)rootPkg->prefix, 0, size);
-            memcpy((void *)rootPkg->prefix, prefix, size);
+            free(rootPackage->prefix);
+            rootPackage->prefix = malloc(size);
+            memset((void *)rootPackage->prefix, 0, size);
+            memcpy((void *)rootPackage->prefix, prefix, size);
         }
     }
 
@@ -371,19 +347,19 @@ int buildPackage(const char *dir)
 #endif
 
         if (cflags)
-            asprintf(&flags, "%s -I %s", cflags, opts.dir);
+            asprintf(&flags, "%s -I %s", cflags, options.dir);
         else
-            asprintf(&flags, "-I %s", opts.dir);
+            asprintf(&flags, "-I %s", options.dir);
 
-        if (rootPkg && rootPkg->prefix)
+        if (rootPackage && rootPackage->prefix)
         {
-            pkgOpts.prefix = rootPkg->prefix;
-            setPkgOptions(pkgOpts);
-            setenv("PREFIX", pkgOpts.prefix, 1);
+            packageOptions.prefix = rootPackage->prefix;
+            setPkgOptions(packageOptions);
+            setenv("PREFIX", packageOptions.prefix, 1);
         }
-        else if (opts.prefix)
+        else if (options.prefix)
         {
-            setenv("PREFIX", opts.prefix, 1);
+            setenv("PREFIX", options.prefix, 1);
         }
         else if (pkg->prefix)
         {
@@ -400,7 +376,7 @@ int buildPackage(const char *dir)
 
         setenv("CFLAGS", flags, 1);
 
-        if (opts.clean)
+        if (options.clean)
         {
             char *clean = 0;
             // Clean cmd
@@ -408,16 +384,16 @@ int buildPackage(const char *dir)
         }
 
         char *build = 0;
-        if (opts.test)
+        if (options.test)
             // Build with test cmd
             asprintf(&build, "");
         else
             // Build without test cmd
             asprintf(&build, "");
 
-        asprintf(&command, "%s && %s %s %s", clean ? clean : ":", build, opts.force ? "-B" : "", args);
+        asprintf(&command, "%s && %s %s %s", clean ? clean : ":", build, options.force ? "-B" : "", args);
 
-        if (opts.verbose)
+        if (options.verbose)
             logger_warn("build", "%s: %s", pkg->name, pkg->makefile);
 
         debug(&debugger, "system: %s", command);
@@ -463,8 +439,8 @@ int buildPackage(const char *dir)
         list_iterator_t *iterator = 0;
         list_node_t *node = 0;
 #ifdef PTHREADS_HEADER
-        Thread wraps[opts.concurrency];
-        pthread_t threads[opts.concurrency];
+        Thread wraps[options.concurrency];
+        pthread_t threads[options.concurrency];
         unsigned int i = 0;
 #endif
 
@@ -478,8 +454,8 @@ int buildPackage(const char *dir)
             asprintf(&slug, "%s/%s@%s", dep->author, dep->name, dep->version);
             Package *dependency = newPkgSlug(slug, 0);
 
-            if (opts.dir && dependency && dependency->name)
-                depDir = path_join(opts.dir, dependency->name);
+            if (options.dir && dependency && dependency->name)
+                depDir = path_join(options.dir, dependency->name);
 
             free(slug);
             freePkg(dependency);
@@ -496,7 +472,7 @@ int buildPackage(const char *dir)
             wrap->dir = depDir;
             rc = pthread_create(thread, 0, buildPackageThread, wrap);
 
-            if (opts.concurrency <= ++i)
+            if (options.concurrency <= ++i)
             {
                 for (int j = 0; j < i; ++j)
                 {
@@ -526,13 +502,13 @@ int buildPackage(const char *dir)
             list_iterator_destroy(iterator);
     }
 
-    if (opts.dev && pkg->development != 0)
+    if (options.dev && pkg->development != 0)
     {
         list_iterator_t *iterator = 0;
         list_node_t *node = 0;
 #ifdef PTHREADS_HEADER
-        Thread wraps[opts.concurrency];
-        pthread_t threads[opts.concurrency];
+        Thread wraps[options.concurrency];
+        pthread_t threads[options.concurrency];
         unsigned int i = 0;
 #endif
         iterator = list_iterator_new(pkg->development, LIST_HEAD);
@@ -544,7 +520,7 @@ int buildPackage(const char *dir)
             asprintf(&slug, "%s/%s@%s", dep->author, dep->name, dep->version);
 
             Package *dependency = newPkgSlug(slug, 0);
-            char *depDir = path_join(opts.dir, dependency->name);
+            char *depDir = path_join(options.dir, dependency->name);
 
             free(slug);
             freePkg(dependency);
@@ -555,7 +531,7 @@ int buildPackage(const char *dir)
             wrap->dir = depDir;
             rc = pthread_create(thread, 0, buildPackageThread, wrap);
 
-            if (opts.concurrency <= ++i)
+            if (options.concurrency <= ++i)
             {
                 for (int j = 0; j < i; ++j)
                 {
@@ -603,34 +579,34 @@ clean:
 
 static void setCache(command_t *self)
 {
-    opts.skipCache = 1;
+    options.skipCache = 1;
     debug(&debugger, "set skip cache flag");
 }
 
 static void setDev(command_t *self)
 {
-    opts.dev = 1;
+    options.dev = 1;
     debug(&debugger, "set dev flag");
 }
 
 static void setForce(command_t *self)
 {
-    opts.force = 1;
+    options.force = 1;
     debug(&debugger, "set force flag");
 }
 
 static void setGlobal(command_t *self)
 {
-    opts.global = 1;
+    options.global = 1;
     debug(&debugger, "set global flag");
 }
 
 static void setClean(command_t *self)
 {
     if (self->arg && self->arg[0] != '-')
-        opts.clean = (char *)self->arg;
+        options.clean = (char *)self->arg;
     else
-        opts.clean = "clean";
+        options.clean = "clean";
 
     debug(&debugger, "set clean flag");
 }
@@ -638,9 +614,9 @@ static void setClean(command_t *self)
 static void setTest(command_t *self)
 {
     if (self->arg && self->arg[0] != '-')
-        opts.test = (char *)self->arg;
+        options.test = (char *)self->arg;
     else
-        opts.test = "test";
+        options.test = "test";
 
     debug(&debugger, "set test flag");
 }
@@ -648,19 +624,19 @@ static void setTest(command_t *self)
 static void setPrefix(command_t *self)
 {
     if (self->arg && self->arg[0] != '-')
-        opts.prefix = (char *)self->arg;
+        options.prefix = (char *)self->arg;
 
-    debug(&debugger, "set prefix: %s", opts.prefix);
+    debug(&debugger, "set prefix: %s", options.prefix);
 }
 
 static void setDir(command_t *self)
 {
-    opts.dir = (char *)self->arg;
-    debug(&debugger, "set dir: %s", opts.dir);
+    options.dir = (char *)self->arg;
+    debug(&debugger, "set dir: %s", options.dir);
 }
 
 static void unsetVerbose(command_t *self)
 {
-    opts.verbose = 0;
+    options.verbose = 0;
     debug(&debugger, "set quiet flag");
 }

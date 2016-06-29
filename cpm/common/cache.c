@@ -1,57 +1,155 @@
 #include "cache.h"
 
-static char pkgCacheDir[BUFSIZ];
-static char searchCache[BUFSIZ];
-static char jsonCacheDir[BUFSIZ];
+static char packageCacheDirectory[BUFSIZ];
+static char searchCacheDirectory[BUFSIZ];
+static char jsonCacheDirectory[BUFSIZ];
 static char cachePath[BUFSIZ];
 static time_t cacheExpiration;
 
-static void pkgCachePath(char *pkgCache, char *author, char *name, char *version)
+const char *getCachePath()
 {
-    sprintf(pkgCache, PKG, pkgCacheDir, author, name, version);
+    return packageCachePath;
 }
 
-static void jsonCachePath(char *jsonCache, char *author, char *name, char *version)
-{
-    sprintf(jsonCache, JSON, jsonCacheDir, author, name, version);
-}
-
-const char *ccPath()
-{
-    return pkgCachePath;
-}
-
-static int dirExist(char *path)
-{
-    if (fs_exists(path) != 0)
-        return mkdirp(path, 0700);
-    return 0;
-}
-
-int ccInit(void)
+int initCache(void)
 {
     sprintf(cachePath, CACHE "/meta", PATH);
-    if (dirExist(cachePath) != 0)
+    if (dirExists(cachePath) != 0)
         return -1;
     return 0;
 }
 
-const char *ccMetaPath()
+const char *cacheMetaPath()
 {
     return cachePath;
 }
 
-int ccCreate(time_t expr)
+int createCache(time_t expr)
 {
     cacheExpiration = expr;
-    sprintf(pkgCachePath, CACHE, "/packages", PATH);
-    sprintf(jsonCachePath, CACHE, "/json", PATH);
-    sprintf(searchCache, CACHE "search.html", PATH);
 
-    if (dirExist(pkgCachePath) != 0)
+    // sprintf require that the pointer has a fixed length beforehand
+    // when its not specified it hang, what if the same behavior happen
+    // when the size doesn't much, this should not hand, must treat the
+    // return value for error, but avoid the hang part
+    // returns the length of the written string
+    sprintf(packageCacheDirectory, CACHE "/packages", PATH);
+    sprintf(jsonCacheDirectory, CACHE "/json", PATH);
+    sprintf(searchCacheDirectory, CACHE "/search", PATH);
+
+    if (dirExists(packageCacheDirectory) != 0 ||
+        dirExists(jsonCacheDirectory) != 0 ||
+        dirExists(searchCacheDirectory) != 0)
         return -1;
-    if (dirExist(jsonCachePath) != 0)
+
+    return 0;
+}
+
+int cacheConfigExists(char *author, char *name, char *version)
+{
+    GET_JSON_CACHE(author, name, version);
+    return !isExpired(jsonCache) && fs_exists(jsonCache) == 0;
+}
+
+char *getCacheConfig(char *author, char *name, char *version)
+{
+    GET_JSON_CACHE(author, name, version);
+
+    if (isExpired(jsonCache))
+        return NULL;
+
+    return fs_read(jsonCache);
+}
+
+int setCacheConfig(char *author, char *name, char *version, char *content)
+{
+    GET_JSON_CACHE(author, name, version);
+    return fs_write(jsonCache, content);
+}
+
+int deleteCacheConfig(char *author, char *name, char *version)
+{
+    GET_JSON_CACHE(author, name, version);
+    return unlink(jsonCache);
+}
+
+int cacheSearchExists()
+{
+    return fs_exists(searchCacheDirectory) == 0;
+}
+
+char *getCacheSearch()
+{
+    if (cacheSearchExists())
+        return NULL;
+    return fs_read(searchCacheDirectory);
+}
+
+int setCacheSearch(char *content)
+{
+    return fs_write(searchCacheDirectory, content);
+}
+
+int deleteCacheSearch()
+{
+    return unlink(searchCacheDirectory);
+}
+
+int cachePackageExists(char *author, char *name, char *version)
+{
+    GET_PKG_CACHE(author, name, version);
+    return !isExpired(pkgCache) && fs_exists(pkgCache) == 0;
+}
+
+int cachePackageExpired(char *author, char *name, char *version)
+{
+    GET_PKG_CACHE(author, name, version);
+    return isExpired(pkgCache);
+}
+
+int cacheSetPackage(char *author, char *name, char *version, char *path)
+{
+    GET_PKG_CACHE(author, name, version);
+    if (fs_exists(pkgCache) == 0)
+        rimraf(pkgCache);
+    return copy_dir(path, pkgCache);
+}
+
+int cacheLoadPackage(char *author, char *name, char *version, char *path)
+{
+    GET_PKG_CACHE(author, name, version);
+    if (fs_exists(pkgCache) == -1)
         return -1;
+    if (isExpired(pkgCache))
+    {
+        rimraf(pkgCache);
+        return -2;
+    }
+
+    return copy_dir(pkgCache, path);
+}
+
+int deleteCachePackage(char *author, char *name, char *version)
+{
+    GET_PKG_CACHE(author, name, version);
+    return rimraf(pkgCache);
+}
+
+static void packageCachePath(char *packageCache, char *author, char *name, char *version)
+{
+    sprintf(packageCache, PKG, packageCacheDirectory, author, name, version);
+}
+
+static void jsonCachePath(char *jsonCache, char *author, char *name, char *version)
+{
+    sprintf(jsonCache, JSON, jsonCacheDirectory, author, name, version);
+}
+
+static int dirExists(char *path)
+{
+    if (fs_exists(path) != 0)
+        return mkdirp(path, 0700);
+
     return 0;
 }
 
@@ -66,93 +164,4 @@ static int isExpired(char *cache)
     free(stat);
 
     return now - modified >= cacheExpiration;
-}
-
-int ccConfigExists(char *author, char *name, char *version)
-{
-    GET_JSON_CACHE(author, name, version);
-    return !isExpired(jsonCache) && fs_exists(jsonCache) == 0;
-}
-
-char *ccGetConfig(char *author, char *name, char *version)
-{
-    GET_JSON_CACHE(author, name, version);
-
-    if (isExpired(jsonCache))
-        return NULL;
-    return fs_read(jsonCache);
-}
-
-int ccSetConfig(char *author, char *name, char *version, char *content)
-{
-    GET_JSON_CACHE(author, name, version);
-    return fs_write(jsonCache, content);
-}
-
-int ccDeleteConfig(char *author, char *name, char *version)
-{
-    GET_JSON_CACHE(author, name, version);
-    return unlink(jsonCache);
-}
-
-int ccSearchExists()
-{
-    return fs_exists(searchCache) == 0;
-}
-
-char *ccGetSearch()
-{
-    if (ccSearchExists())
-        return NULL;
-    return fs_read(searchCache);
-}
-
-int ccSetSearch(char *content)
-{
-    return fs_write(searchCache, content);
-}
-
-int ccDeleteSearch()
-{
-    return unlink(searchCache);
-}
-
-int ccPackageExists(char *author, char *name, char *version)
-{
-    GET_PKG_CACHE(author, name, version);
-    return !isExpired(pkgCache) && fs_exists(pkgCache) == 0;
-}
-
-int ccPackageExpired(char *author, char *name, char *version)
-{
-    GET_PKG_CACHE(author, name, version);
-    return isExpired(pkgCache);
-}
-
-int ccSetPackage(char *author, char *name, char *version, char *path)
-{
-    GET_PKG_CACHE(author, name, version);
-    if (fs_exists(pkgCache) == 0)
-        rimraf(pkgCache);
-    return copy_dir(path, pkgCache);
-}
-
-int ccLoadPackage(char *author, char *name, char *version, char *path)
-{
-    GET_PKG_CACHE(author, name, version);
-    if (fs_exists(pkgCache) == -1)
-        return -1;
-    if (isExpired(pkgCache))
-    {
-        rimraf(pkgCache);
-        return -2;
-    }
-
-    return copy_dir(pkgCache, path);
-}
-
-int ccDeletePackage(char *author, char *name, char *version)
-{
-    GET_PKG_CACHE(author, name, version);
-    return rimraf(pkgCache);
 }

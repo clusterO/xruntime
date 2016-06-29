@@ -17,6 +17,32 @@
 #define realpath(fn, rn) _fullpath(fn, rn, strlen(fn))
 #endif
 
+#ifdef PTHREADS_HEADER
+static void curlLock(CURL *handle, curl_lock_data data, curl_lock_access access, void *userptr)
+{
+    pthread_mutex_lock(&lock.mutex);
+}
+
+static void curlUnlock(CURL *handle, curl_lock_data data, curl_lock_access access, void *userptr)
+{
+    pthread_mutex_unlock(&lock_mutex);
+}
+
+static void intCurlShare()
+{
+    if (cpcs == 0)
+    {
+        pthread_mutex_lock(&lock.mutex);
+        cpcs = curl_share_init();
+        curl_share_setopt(cpcs, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
+        curl_share_setopt(cpcs, CURLSHOPT_LOCKFUNC, curlLock);
+        curl_share_setopt(cpcs, CURLSHOPT_UNLOCKFUNC, curlUnlock);
+        curl_share_setopt(cpcs, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+        pthread_mutex_unlock(&lock.mutex);
+    }
+}
+#endif
+
 #define _debug(...)                            \
     ({                                         \
         if (!(_debugger.name))                 \
@@ -31,7 +57,6 @@
             goto clean;             \
     })
 
-#include <curl/curl.h>
 #include <libgen.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -40,15 +65,16 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <curl/curl.h>
 
 #include "cache.h"
+#include "../libs/debug.h"
 #include "../libs/list.h"
 #include "../libs/hash.h"
 #include "../libs/logger.h"
 #include "../libs/parson.h"
 #include "../libs/asprintf.h"
 #include "../libs/http-get.h"
-#include "../libs/debug.h"
 #include "../libs/path-join.h"
 #include "../libs/parse-repo.h"
 #include "../libs/tempdir.h"
@@ -110,35 +136,35 @@ typedef struct
     char *token;
 } Options;
 
-static inline char *json_object_get_string_safe(JSON_Object *obj, const char *key);
-static inline char *json_array_get_string_safe(JSON_Array *arr, const char *i);
-static inline char buildFileUrl(const char *url, const char *file);
+extern Package *loadPackage(const char *, int);
+extern Package *loadManifest(int);
+extern Package *newPackage(const char *, int);
+extern Package *newPackageSlug(const char *, int);
+extern Package *packageSlug(const char *slug, int verbose, const char *file);
+extern Dependency *newDependency(const char *, const char *);
+extern int installExecutable(Package *pkg, char *path, int verbose);
+extern int installRootPackage(Package *pkg, const char *dir, int verbose);
+extern int installDependency(Package *, const char *, int);
+extern int installDevPackage(Package *, const char *, int);
+extern void freePackage(Package *);
+static int fetchFile(Package *pkg, const char *dir, char *file, int verbose);
+static int fetchPackage(Package *pkg, const char *dir, char *file, int verbose, void **data);
+extern void freeDependency(Dependency *);
+extern void setPackageOptions(Options);
+extern char *packageUrl(const char *, const char *, const char *);
+extern char *packageRepoUrl(const char *repo, const char *version);
+extern char *packageAuthor(const char *);
+extern char *packageVersion(const char *);
+extern char *packageName(const char *);
+extern void cleanPackages();
+static void *fetchThreadFile(void *arg);
+static inline char *jsonObjectGetStringSafe(JSON_Object *obj, const char *key);
+static inline char *jsonArrayGetStringSafe(JSON_Array *arr, const char *i);
+static inline char *buildFileUrl(const char *url, const char *file);
 static inline char *buildSlug(const char *author, const char *name, const char *version);
 static inline char *buildRepo(const char *author, const char *name);
-static inline list_t *parseDependencies(JSON_Object *json);
 static inline int install(list_t *list, const char *dir, int verbose);
-static int fetchFile(Package *pkg, const char *dir, char *file, int verbose);
-static void *fetchThreadFile(void *arg);
-static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void **data);
-static Package *pkgSlug(const char *slug, int verbose, const char *file);
-
-extern void setPkgOptions(Options);
-extern Package *newPkg(const char *, int);
-extern Package *newPkgSlug(const char *, int);
-extern Package *loadPkg(const char *, int);
-extern Package *loadManifest(int);
-extern char *pkgUrl(const char *, const char *, const char *);
-extern char *pkgRepoUrl(const char *repo, const char *version);
-extern char *pkgVersion(const char *);
-extern char *pkgAuthor(const char *);
-extern char *pkgName(const char *);
-extern Dependency *newDeps(const char *, const char *);
-extern int installExe(Package *pkg, char *path, int verbose);
-extern int installPkg(Package *, const char *, int);
-extern int installDeps(Package *, const char *, int);
-extern int installDev(Package *, const char *, int);
-extern void freePkg(Package *);
-extern void freeDeps(Dependency *);
-extern void cleanPkgs();
+static inline list_t *parseDependencies(JSON_Object *json);
+static http_get_response_t *download(char *jsonUrl);
 
 #endif

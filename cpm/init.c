@@ -32,8 +32,11 @@ int main(int argc, char **argv)
         goto finish;
     }
 
+    // enhance - read more info and test for the -y flag to skip with defaults
     readInput(root, "name", basepath, pkgName);
     readInput(root, "version", "0.1.0", "version (default: 0.1.0): ");
+    // read repo/reponame or add default
+    // read author
 
     exit = writePackages(options.manifest, json);
 

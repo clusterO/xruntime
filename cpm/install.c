@@ -1,6 +1,6 @@
 #include "install.h"
 
-// needs to go global or something DRY
+long pathMax;
 debug_t debugger = {0};
 
 static InstallOptions options = {0};
@@ -20,56 +20,22 @@ static void setConcurrency(command_t *self)
 
 int main(int argc, char **argv)
 {
-    long pathMax;
-
+    options.verbose = 1;
+    options.dev = 0;
 #ifdef _WIN32
     options.dir = ".\\deps";
 #else
     options.dir = "./deps";
 #endif
-
-    options.verbose = 1;
-    options.dev = 0;
-
-#ifdef PATH_MAX
-    pathMax = PATH_MAX;
-#elif defined(_PC_PATH_MAX)
-    pathMax = pathconf(options.dir, _PC_PATH_MAX);
-#else
-    pathMax = 4096;
-#endif
-
-    debug_init(&debugger, "install");
-
-    ccInit(PACKAGE_CACHE_TIME);
-
-    command_t program;
-    command_init(&program, "intall", VERSION);
-    program.usage = "[options] [name <>]";
-
-    command_option(&program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
-    command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
-    command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
-    command_option(&program, "-d", "--dev", "install develmopent dependency", setDev);
-    command_option(&program, "-S", "--save", "Save dependency in manifest.json", setSave);
-    command_option(&program, "-D", "--save-dev", "Save develmopent dependency to manifest.json", setSaveDev);
-    command_option(&program, "-f", "--force", "Force the action", setForce);
-    command_option(&program, "-c", "--skip-cache", "Skip cache when installing", setSkipCache);
-    command_option(&program, "-g", "--global", "Global install", setGlobal);
-    command_option(&program, "-t", "--token <token>", "Set access token", setToken);
-
-#ifdef PTHREADS_HEADER
-    command_option(&program, "-C", "--concurrency <number>", "Set concurrency", setConcurrency);
-#endif
-    command_parse(&program, argc, argv);
-
-    debug(&debugger, "%d arguments", program.argc);
-
-    if (curl_global_init(CURL_GLOBAL_ALL) != 0)
-        logger_error("error", "Failed to initialize cURL");
-
     if (options.prefix)
     {
+#ifdef PATH_MAX
+        pathMax = PATH_MAX;
+#elif defined(_PC_PATH_MAX)
+        pathMax = pathconf(options.dir, _PC_PATH_MAX);
+#else
+        pathMax = 4096;
+#endif
         char prefix[pathMax];
         memset(prefix, 0, pathMax);
         realpath(options.prefix, prefix);
@@ -79,19 +45,28 @@ int main(int argc, char **argv)
         memcpy((void *)options.prefix, prefix, size);
     }
 
-    ccInit(PACKAGE_CACHE_TIME);
+    debug_init(&debugger, "install");
+
+    if (createCache(PACKAGE_CACHE_TIME) != 0)
+        return -1;
+
+    command_t program;
+    getCommandOptions(&program, argc, argv);
+    debug(&debugger, "%d arguments", program.argc);
+
+    if (curl_global_init(CURL_GLOBAL_ALL) != 0)
+        logger_error("error", "Failed to initialize cURL");
 
     packageOptions.skipCache = options.skipCache;
     packageOptions.prefix = options.prefix;
     packageOptions.global = options.global;
     packageOptions.force = options.force;
     packageOptions.token = options.token;
-
 #ifdef PTHREADS_HEADER
     packageOptions.concurrency = options.concurrency;
 #endif
 
-    setPkgOptions(packageOptions);
+    setPackageOptions(packageOptions);
 
     if (options.prefix)
     {
@@ -102,22 +77,29 @@ int main(int argc, char **argv)
     if (options.force)
         setenv("FORCE", "1", 1);
 
-    int code = program.argc == 0 ? installLocalpkgs() : installPackages(program.argc, program.argv);
+    int code;
+    if (program.argc == 0)
+        code = installLocalPackages();
+    else
+        code = installPackages(program.argc, program.argv);
 
+    cleanPackages();
     curl_global_cleanup();
-    cleanPkgs();
     command_free(&program);
+
     return code;
 }
 
-static int installLocalpkgs()
+static int installLocalPackages()
 {
-    // this file lives in the output folder, should be moved to the actual project folder
+    // this file lives in the output folder
+    // should be moved to the actual project folder
     const char *file = "manifest.json";
 
     if (fs_exists(file) == -1)
     {
         logger_error("error", "Missing manifest file");
+        printf("Please run 'cpm init' to initialize the project.\n");
         return 1;
     }
 
@@ -127,42 +109,44 @@ static int installLocalpkgs()
     if (json == NULL)
         return 1;
 
-    Package *pkg = newPkg(json, options.verbose);
+    Package *pkg = newPackage(json, options.verbose);
     if (pkg == NULL)
         goto e1;
+
     if (pkg->prefix)
         setenv("PREFIX", pkg->prefix, 1);
 
-    int rc = installDeps(pkg, options.dir, options.verbose);
+    int rc = installDependency(pkg, options.dir, options.verbose);
     if (rc == -1)
         goto e2;
 
     if (options.dev)
     {
-        rc = installDev(pkg, options.dir, options.verbose);
+        rc = installDevPackage(pkg, options.dir, options.verbose);
         if (rc == -1)
             goto e2;
     }
 
     free(json);
-    freePkg(pkg);
+    freePackage(pkg);
     return 0;
 
 e2:
-    freePkg(pkg);
+    freePackage(pkg);
 e1:
+    printf("e1");
     free(json);
     return 1;
 }
 
-static int installPackages(int n, char **pkgs)
+static int installPackages(int n, char **packages)
 {
     for (int i = 0; i < n; i++)
     {
-        debug(&debugger, "install %s (%d)", pkgs[i], i);
-
-        if (installPackage(pkgs[i]) == -1)
+        if (installPackage(packages[i]) == -1)
             return 1;
+
+        debug(&debugger, "install %s (%d)", packages[i], i);
     }
 
     return 0;
@@ -170,17 +154,8 @@ static int installPackages(int n, char **pkgs)
 
 static int installPackage(const char *slug)
 {
-    Package *pkg = NULL;
+    Package *package = NULL;
     int rc;
-    long pathMax;
-
-#ifdef PATH_MAX
-    pathMax = PATH_MAX;
-#elif defined(_PC_PATH_MAX)
-    pathMax = pathconf(slug, _PC_PATH_MAX);
-#else
-    pathMax = 4096;
-#endif
 
     if (!rootPackage)
     {
@@ -188,17 +163,17 @@ static int installPackage(const char *slug)
         char *json = fs_read(name);
 
         if (json)
-            rootPackage = newPkg(json, options.verbose);
+            rootPackage = newPackage(json, options.verbose);
     }
 
     if (slug[0] == '.')
-        if (strlen(slug) == 1 || (slug[1] == '/' && strlen(slug) == 2))
+        if (strlen(slug) == 1 || (slug[1] == '/' && strlen(slug) == 2)) // risk of condition at 1
         {
             char dir[pathMax];
             realpath(slug, dir);
             slug = dir;
 
-            return installLocalpkgs("manifest.json");
+            return installLocalPackages("manifest.json");
         }
 
     if (fs_exists(slug) == 0)
@@ -212,50 +187,75 @@ static int installPackage(const char *slug)
                                   ))
         {
             free(stats);
-            return installLocalpkgs(slug);
+            return installLocalPackages(slug);
         }
 
         if (stats)
             free(stats);
     }
 
-    if (!pkg)
-        pkg = newPkgSlug(slug, options.verbose);
+    if (!package)
+        package = newPackageSlug(slug, options.verbose);
 
-    if (pkg == NULL)
+    if (package == NULL)
         return -1;
+
+    printf("another delimiter\n");
 
     if (rootPackage && rootPackage->prefix)
     {
         packageOptions.prefix = rootPackage->prefix;
-        setPkgOptions(packageOptions);
+        setPackageOptions(packageOptions);
     }
 
-    rc = installPkg(pkg, options.dir, options.verbose);
+    printf("root package prefix checked\n");
+
+    rc = installRootPackage(package, options.dir, options.verbose);
     if (rc != 0)
         goto clean;
 
     if (rc == 0 && options.dev)
     {
-        rc = installDev(pkg, options.dir, options.verbose);
+        rc = installDevPackage(package, options.dir, options.verbose);
         if (rc != 0)
             goto clean;
     }
 
-    if (pkg->repo == 0 || strcmp(slug, pkg->repo) != 0)
-        pkg->repo = strdup(slug);
+    if (package->repo == 0 || strcmp(slug, package->repo) != 0)
+        package->repo = strdup(slug);
 
     if (options.save)
-        saveDeps(pkg);
+        saveDependency(package);
     if (options.savedev)
-        saveDevDeps(pkg);
+        saveDevDependency(package);
 
 clean:
-    freePkg(pkg);
+    freePackage(package);
     return rc;
 }
 
-static int writeDeps(Package *pkg, char *prefix)
+static void getCommandOptions(command_t *program, int argc, char **argv)
+{
+    command_init(program, "install", VERSION);
+    program->usage = "[options] [name <>]";
+
+    command_option(program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
+    command_option(program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
+    command_option(program, "-q", "--quiet", "Disable verbose", unsetVerbose);
+    command_option(program, "-d", "--dev", "install develmopent dependency", setDev);
+    command_option(program, "-S", "--save", "Save dependency in manifest.json", setSave);
+    command_option(program, "-D", "--save-dev", "Save develmopent dependency to manifest.json", setSaveDev);
+    command_option(program, "-f", "--force", "Force the action", setForce);
+    command_option(program, "-c", "--skip-cache", "Skip cache when installing", setSkipCache);
+    command_option(program, "-g", "--global", "Global install", setGlobal);
+    command_option(program, "-t", "--token <token>", "Set access token", setToken);
+#ifdef PTHREADS_HEADER
+    command_option(&program, "-C", "--concurrency <number>", "Set concurrency", setConcurrency);
+#endif
+    command_parse(program, argc, argv);
+}
+
+static int writeDependency(Package *pkg, char *prefix)
 {
     const char *file = "manifest.json";
     JSON_Value *pkgJson = json_parse_file(file);
@@ -280,16 +280,16 @@ static int writeDeps(Package *pkg, char *prefix)
     return rc;
 }
 
-static int saveDeps(Package *pkg)
+static int saveDependency(Package *pkg)
 {
     debug(&debugger, "savind dependency %s at %s", pkg->name, pkg->version);
-    return writeDeps(pkg, "dependencies");
+    return writeDependency(pkg, "dependencies");
 }
 
-static int saveDevDeps(Package *pkg)
+static int saveDevDependency(Package *pkg)
 {
     debug(&debugger, "savind dev dependency %s at %s", pkg->name, pkg->version);
-    return writeDeps(pkg, "develmopent");
+    return writeDependency(pkg, "develmopent");
 }
 
 static void setDir(command_t *self)

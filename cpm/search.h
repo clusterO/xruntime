@@ -1,23 +1,6 @@
 #ifndef _SEARCH_HEADER_
 #define _SEARCH_HEADER_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include "libs/strdup.h"
-#include "libs/logger.h"
-#include "libs/fs.h"
-#include "libs/debug.h"
-#include "libs/asprintf.h"
-#include "common/package.h"
-#include "common/cache.h"
-#include "libs/http-get.h"
-#include "libs/console-colors.h"
-#include "libs/parson.h"
-#include "libs/commander.h"
-#include "libs/wiki-registry.h"
-
 #ifndef VERSION
 #define VERSION "0.1.0"
 #endif
@@ -29,8 +12,6 @@
 #define setenv(n, v, o) _putenv_s(n, v)
 #define realpath(p, rp) _fullpath(p, rp, strlen(p))
 #endif
-
-debug_t debugger;
 
 #define COMPARE(v)                      \
     {                                   \
@@ -48,12 +29,32 @@ debug_t debugger;
             }                           \
     }
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include "libs/strdup.h"
+#include "libs/logger.h"
+#include "libs/fs.h"
+#include "libs/debug.h"
+#include "libs/asprintf.h"
+#include "libs/http-get.h"
+#include "libs/console-colors.h"
+#include "libs/parson.h"
+#include "libs/commander.h"
+#include "libs/wiki-registry.h"
+#include "common/package.h"
+#include "common/cache.h"
+
+debug_t debugger;
+
+static char *cacheSearch();
+static int matches(int count, char *args[], wiki_package_t *pkg);
+static void showPkg(const wiki_package_t *pkg, cc_color_t highlightColor, cc_color_t textColor);
+static void addPkgToJson(const wiki_package_t *pkg, JSON_Array *jsonList);
 static void unsetColor();
 static void unsetCache();
 static void setJson();
-static int matches(int count, char *args[], wiki_package_t *pkg);
-static char *cacheSearch();
-static void showPkg(const wiki_package_t *pkg, cc_color_t highlightColor, cc_color_t textColor);
-static void addPkgToJson(const wiki_package_t *pkg, JSON_Array *jsonList);
 
 #endif

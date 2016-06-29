@@ -10,8 +10,10 @@ int main(int argc, char **argv)
     cache = 1;
 
     debug_init(&debugger, "search");
+
     ccInit(SEARCH_CACHE_TIME);
 
+    // to be moved, commun commander
     command_t program;
     command_init(&program, "search", VERSION);
     program.usage = "[options] [query <>]";
@@ -27,6 +29,7 @@ int main(int argc, char **argv)
     cc_color_t highlightColor = color ? CC_FG_DARK_GREEN : CC_FG_NONE;
     cc_color_t textColor = color ? CC_FG_GRAY : CC_FG_NONE;
 
+    // look in the cache
     char *html = cacheSearch();
     if (html == NULL)
     {
@@ -130,6 +133,7 @@ static char *cacheSearch()
         char *data = ccGetSearch();
         if (data)
             return data;
+
         goto setCache;
     }
 
@@ -142,10 +146,12 @@ setCache:
     char *html = strdup(res->data);
     if (html == NULL)
         return NULL;
+
     http_get_free(res);
 
     ccSetSearch(html);
     debug(&debugger, "Save cache");
+
     return html;
 }
 

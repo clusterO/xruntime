@@ -1,28 +1,18 @@
 #include "upgrade.h"
 
-static struct options opts = {0};
-static Options pkgOpts = {0};
-static Package *rootPkg = NULL;
-
-#ifdef PTHREADS_HEADER
-static void setConcurrency(command_t *self)
-{
-    if (self->arg)
-    {
-        opts.concurrency = atol(self->arg);
-        debug(&debugger, "set concurrency: %lu", opts.concurrency);
-    }
-}
-#endif
+static UpgradeOptions options = {0};
+static Options packageOptions = {0};
+static Package *rootPackage = NULL;
 
 int main(int argc, char **argv)
 {
-    opts.verbose = 1;
+    options.verbose = 1;
     long pathMax = 4096;
 
     debug_init(&debugger, "upgrade");
     ccInit(PACKAGE_CACHE_TIME);
 
+    // move to commun commander
     command_t program;
     command_init(&program, "upgrade", VERSION);
     program.usage = "[options] [name <>]";
@@ -33,6 +23,7 @@ int main(int argc, char **argv)
     command_option(&program, "-t", "--token <token>", "Access token", setToken);
     command_option(&program, "-S", "--slug <slug>", "Project path", setSlug);
     command_option(&program, "-T", "--tag <tag>", "The tag to upgrade to 'default: latest'", setTag);
+
 #ifdef PTHREADS_HEADER
     command_option(&program, "-C", "--concurrency <number>", "Set concurrency 'default: " S(MAX_THREADS) "'", setConcurrency);
 #endif
@@ -43,49 +34,50 @@ int main(int argc, char **argv)
     if (curl_global_init(CURL_GLOBAL_ALL) != 0)
         logger_error("error", "Failed to initialize cURL");
 
-    if (opts.prefix)
+    // DRY
+    if (options.prefix)
     {
         char prefix[pathMax];
         memset(prefix, 0, pathMax);
-        realpath(opts.prefix, prefix);
+        realpath(options.prefix, prefix);
         unsigned long int size = strlen(prefix) + 1;
-        opts.prefix = malloc(size);
-        memset((void *)opts.prefix, 0, size);
-        memcpy((void *)opts.prefix, prefix, size);
+        options.prefix = malloc(size);
+        memset((void *)options.prefix, 0, size);
+        memcpy((void *)options.prefix, prefix, size);
     }
 
     ccInit(PACKAGE_CACHE_TIME);
 
-    pkgOpts.skipCache = 1;
-    pkgOpts.prefix = opts.prefix;
-    pkgOpts.global = 1;
-    pkgOpts.force = opts.force;
-    pkgOpts.token = opts.token;
+    packageOptions.skipCache = 1;
+    packageOptions.prefix = options.prefix;
+    packageOptions.global = 1;
+    packageOptions.force = options.force;
+    packageOptions.token = options.token;
 
 #ifdef PTHREADS_HEADER
-    pkgOpts.concurrency = opts.concurrency;
+    packageOptions.concurrency = options.concurrency;
 #endif
 
-    setPkgOptions(pkgOpts);
+    setPkgOptions(packageOptions);
 
-    if (opts.prefix)
+    if (options.prefix)
     {
-        setenv("CPM_PREFIX", opts.prefix, 1);
-        setenv("PREFIX", opts.prefix, 1);
+        setenv("CPM_PREFIX", options.prefix, 1);
+        setenv("PREFIX", options.prefix, 1);
     }
 
-    if (opts.force)
+    if (options.force)
         setenv("CPM_FORCE", "1", 1);
 
     char *slug = 0;
 
-    if (opts.tag == 0 && program.argv[0] != 0)
-        opts.tag = program.argv[0];
+    if (options.tag == 0 && program.argv[0] != 0)
+        options.tag = program.argv[0];
 
-    if (opts.slug)
+    if (options.slug)
         slug = "cpm";
     else
-        slug = opts.slug;
+        slug = options.slug;
 
     int code = installPackage(slug);
 
@@ -96,46 +88,47 @@ int main(int argc, char **argv)
     return code;
 }
 
+// DRY these functions
 static int installPackage(const char *slug)
 {
     Package *pkg = NULL;
     int rc;
 
-    if (!rootPkg)
+    if (!rootPackage)
     {
         const char *name = "package.json";
         char *json = fs_read(name);
 
         if (json)
-            rootPkg = newPkg(json, opts.verbose);
+            rootPackage = newPkg(json, options.verbose);
     }
 
     char *extendedSlug = 0;
-    if (opts.tag != 0)
-        asprintf(&extendedSlug, "%s@%s", slug, opts.tag);
+    if (options.tag != 0)
+        asprintf(&extendedSlug, "%s@%s", slug, options.tag);
 
     if (extendedSlug != 0)
-        pkg = newPkgSlug(extendedSlug, opts.verbose);
+        pkg = newPkgSlug(extendedSlug, options.verbose);
     else
-        pkg = newPkgSlug(slug, opts.verbose);
+        pkg = newPkgSlug(slug, options.verbose);
 
     if (pkg == NULL)
     {
-        if (opts.tag)
-            logger_error("error", "Unable to install this tag %s.", opts.tag);
+        if (options.tag)
+            logger_error("error", "Unable to install this tag %s.", options.tag);
         return -1;
     }
 
-    if (rootPkg && rootPkg->prefix)
+    if (rootPackage && rootPackage->prefix)
     {
-        pkgOpts.prefix = rootPkg->prefix;
-        setPkgOptions(pkgOpts);
+        packageOptions.prefix = rootPackage->prefix;
+        setPkgOptions(packageOptions);
     }
 
     char *tmp = gettempdir();
 
     if (tmp != 0)
-        rc = installPkg(pkg, tmp, opts.verbose);
+        rc = installPkg(pkg, tmp, options.verbose);
     else
     {
         rc = -1;
@@ -157,36 +150,36 @@ clean:
 
 static void setSlug(command_t *self)
 {
-    opts.slug = (char *)self->arg;
-    debug(&debugger, "set slug: %s", opts.slug);
+    options.slug = (char *)self->arg;
+    debug(&debugger, "set slug: %s", options.slug);
 }
 
 static void setTag(command_t *self)
 {
-    opts.tag = (char *)self->arg;
-    debug(&debugger, "set tag: %s", opts.tag);
+    options.tag = (char *)self->arg;
+    debug(&debugger, "set tag: %s", options.tag);
 }
 
 static void setPrefix(command_t *self)
 {
-    opts.prefix = (char *)self->arg;
-    debug(&debugger, "set prefix: %s", opts.prefix);
+    options.prefix = (char *)self->arg;
+    debug(&debugger, "set prefix: %s", options.prefix);
 }
 
 static void setToken(command_t *self)
 {
-    opts.token = (char *)self->arg;
-    debug(&debugger, "set token: %s", opts.token);
+    options.token = (char *)self->arg;
+    debug(&debugger, "set token: %s", options.token);
 }
 
 static void unsetVerbose(command_t *self)
 {
-    opts.verbose = 0;
+    options.verbose = 0;
     debug(&debugger, "unset verbose");
 }
 
 static void setForce(command_t *self)
 {
-    opts.force = 1;
+    options.force = 1;
     debug(&debugger, "set force flag");
 }

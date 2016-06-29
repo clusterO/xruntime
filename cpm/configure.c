@@ -4,12 +4,12 @@ char **argV = 0;
 int argC = 0;
 int offset = 0;
 
-Options pkgOpts = {0};
-Package *rootPkg = NULL;
+Options packageOptions = {0};
+Package *rootPackage = NULL;
 debug_t debugger = {0};
 hash_t *configured = 0;
 
-struct options opts = {
+ConfigOptions options = {
     .skipCache = 0,
     .verbose = 1,
     .force = 0,
@@ -24,42 +24,15 @@ struct options opts = {
 #endif
 };
 
-#ifdef PTHREADS_HEADER
-static void setConcurrency(command_t *self)
-{
-    if (self->arg)
-    {
-        opts.concurrency = atol(self->arg);
-        debug(&debugger, "set concurrenc: %lu", opts.concurrency);
-    }
-}
-#endif
-
-#ifdef PTHREADS_HEADER
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-
-struct Thread
-{
-    const char *dir;
-};
-
-void *configurePackageThread(void *arg)
-{
-    Thread *wrap = arg;
-    const char *dir = wrap->dir;
-    configurePackage(dir);
-    return 0;
-}
-#endif
-
 int main(int argc, char **argv)
 {
     int rc = 0;
     long pathMax;
+
 #ifdef PATH_MAX
     pathMax = PATH_MAX;
 #elif defined(_PC_PATH_MAX)
-    pathMax = pathconf(opts.dir, _PC_PATH_MAX);
+    pathMax = pathconf(options.dir, _PC_PATH_MAX);
 #else
     pathMax = 4096;
 #endif
@@ -73,6 +46,7 @@ int main(int argc, char **argv)
     configured = hash_new();
     hash_set(configured, "configure", VERSION);
 
+    // to be moved
     command_t program;
     command_init(&program, "configure", VERSION);
     debug_init(&debugger, "configure");
@@ -86,31 +60,32 @@ int main(int argc, char **argv)
     command_option(&program, "-f", "--force", "Force the action", setForce);
     command_option(&program, "-cflags", "--flags", "Output compiler flags", setFlags);
     command_option(&program, "-c", "--skip-cache", "Skip caching", setCache);
+
 #ifdef PTHREADS_HEADER
     command_option(&program, "-C", "--concurrency <number>", "Set concurrency", setConcurrency);
 #endif
     command_parse(&program, argc, argv);
 
-    if (opts.dir)
+    if (options.dir)
     {
         char dir[pathMax];
         memset(dir, 0, pathMax);
-        realpath(opts.dir, dir);
+        realpath(options.dir, dir);
         unsigned long int size = strlen(dir) + 1;
-        opts.dir = malloc(size);
-        memset((void *)opts.dir, 0, size);
-        memcpy((void *)opts.dir, dir, size);
+        options.dir = malloc(size);
+        memset((void *)options.dir, 0, size);
+        memcpy((void *)options.dir, dir, size);
     }
 
-    if (opts.prefix)
+    if (options.prefix)
     {
         char prefix[pathMax];
         memset(prefix, 0, pathMax);
-        realpath(opts.prefix, prefix);
+        realpath(options.prefix, prefix);
         unsigned long int size = strlen(prefix) + 1;
-        opts.prefix = malloc(size);
-        memset((void *)opts.prefix, 0, size);
-        memcpy((void *)opts.prefix, prefix, size);
+        options.prefix = malloc(size);
+        memset((void *)options.prefix, 0, size);
+        memcpy((void *)options.prefix, prefix, size);
     }
 
     offset = program.argc;
@@ -119,6 +94,7 @@ int main(int argc, char **argv)
     {
         int rest = 0;
         int i = 0;
+
         do
         {
             char *arg = program.nargv[i];
@@ -139,6 +115,7 @@ int main(int argc, char **argv)
 
         int j = 0;
         int i = offset;
+
         do
         {
             argV[j++] = program.nargv[i++];
@@ -153,21 +130,21 @@ int main(int argc, char **argv)
 
     ccInit(PACKAGE_CACHE_TIME);
 
-    pkgOpts.skipCache = opts.skipCache;
-    pkgOpts.prefix = opts.prefix;
-    pkgOpts.global = opts.global;
-    pkgOpts.force = opts.force;
+    packageOptions.skipCache = options.skipCache;
+    packageOptions.prefix = options.prefix;
+    packageOptions.global = options.global;
+    packageOptions.force = options.force;
 
-    setPkgOptions(pkgOpts);
+    setPkgOptions(packageOptions);
 
-    if (opts.prefix)
+    if (options.prefix)
     {
-        setenv("CPM_PREFIX", opts.prefix, 1);
-        setenv("PREFIX", opts.prefix, 1);
+        setenv("CPM_PREFIX", options.prefix, 1);
+        setenv("PREFIX", options.prefix, 1);
     }
 
-    if (opts.force)
-        setenv("FORCE", opts.force, 1);
+    if (options.force)
+        setenv("FORCE", options.force, 1);
 
     if (program.argc == 0 || (argc == offset + argC))
         rc = configurePackage(CWD);
@@ -176,6 +153,7 @@ int main(int argc, char **argv)
         for (int i = 1; i <= offset; ++i)
         {
             char *dep = program.nargv[i];
+
             if (dep[0] == '.')
             {
                 char dir[pathMax];
@@ -186,7 +164,7 @@ int main(int argc, char **argv)
             {
                 fs_stats *stats = fs_stat(dep);
                 if (!stats)
-                    dep = path_join(opts.dir, dep);
+                    dep = path_join(options.dir, dep);
                 else
                     free(stats);
             }
@@ -219,9 +197,11 @@ int main(int argc, char **argv)
     }
 
     int totalConfigured = 0;
+
     hash_each(configured, {
         if (strncmp("t", val, 1))
             (void)totalConfigured++;
+
         if (key != 0)
             free((void *)key);
     });
@@ -231,11 +211,11 @@ int main(int argc, char **argv)
     curl_global_cleanup();
     cleanPkgs();
 
-    if (opts.dir)
-        free(opts.dir);
+    if (options.dir)
+        free(options.dir);
 
-    if (opts.prefix)
-        free(opts.prefix);
+    if (options.prefix)
+        free(options.prefix);
 
     if (argC > 0)
     {
@@ -247,10 +227,10 @@ int main(int argc, char **argv)
 
     if (rc == 0)
     {
-        if (opts.flags && totalConfigured > 0)
+        if (options.flags && totalConfigured > 0)
             printf("\n");
 
-        if (opts.verbose)
+        if (options.verbose)
             logger_info("info", "configured %d packages", totalConfigured);
     }
 
@@ -263,6 +243,7 @@ int configurePackage(const char *dir)
     char *json = 0;
     int ok, rc;
     long pathMax;
+
 #ifdef PATH_MAX
     pathMax = PATH_MAX;
 #elif defined(_PC_PATH_MAX)
@@ -279,23 +260,23 @@ int configurePackage(const char *dir)
     pthread_mutex_lock(&mutex);
 #endif
 
-    if (!rootPkg)
+    if (!rootPackage)
     {
         const char *name = "manifest.json";
         const *json = fs_read(name);
         if (json)
-            rootPkg = newPkg(json, opts.verbose);
+            rootPackage = newPkg(json, options.verbose);
 
-        if (rootPkg && rootPkg->prefix)
+        if (rootPackage && rootPackage->prefix)
         {
             char prefix[pathMax];
             memset(prefix, 0, pathMax);
-            realpath(rootPkg->prefix, prefix);
+            realpath(rootPackage->prefix, prefix);
             unsigned long int size = strlen(prefix) + 1;
-            free(rootPkg->prefix);
-            rootPkg->prefix = malloc(size);
-            memset((void *)rootPkg->prefix, 0, size);
-            memcpy((void *)rootPkg->prefix, prefix, size);
+            free(rootPackage->prefix);
+            rootPackage->prefix = malloc(size);
+            memset((void *)rootPackage->prefix, 0, size);
+            memcpy((void *)rootPackage->prefix, prefix, size);
         }
     }
 
@@ -340,7 +321,7 @@ int configurePackage(const char *dir)
         goto clean;
     }
 
-    if (pkg->flags != 0 && opts.flags)
+    if (pkg->flags != 0 && options.flags)
     {
 #ifdef PTHREADS_HEADER
         rc = pthread_mutex_lock(&mutex);
@@ -357,15 +338,15 @@ int configurePackage(const char *dir)
 
         asprintf(&command, "cd %s && %s %s", dir, pkg->configure, args);
 
-        if (rootPkg && rootPkg->prefix)
+        if (rootPackage && rootPackage->prefix)
         {
-            pkgOpts.prefix = rootPkg->prefix;
-            setPkgOptions(pkgOpts);
-            setenv("PREFIX", pkgOpts.prefix, 1);
+            packageOptions.prefix = rootPackage->prefix;
+            setPkgOptions(packageOptions);
+            setenv("PREFIX", packageOptions.prefix, 1);
         }
-        else if (opts.prefix)
+        else if (options.prefix)
         {
-            setenv("PREFIX", opts.prefix, 1);
+            setenv("PREFIX", options.prefix, 1);
         }
         else if (pkg->prefix)
         {
@@ -382,7 +363,7 @@ int configurePackage(const char *dir)
 
         if (argC > 0)
             free(args);
-        if (opts.verbose != 0)
+        if (options.verbose != 0)
             logger_warn("configure", "%s: %s", pkg->name, pkg->configure);
 
         debug(&debugger, "system: %s", command);
@@ -419,8 +400,8 @@ int configurePackage(const char *dir)
         list_node_t *node = 0;
 
 #ifdef PTHREADS_HEADER
-        Thread wraps[opts.concurrency];
-        pthread_t threads[opts.concurrency];
+        Thread wraps[options.concurrency];
+        pthread_t threads[options.concurrency];
         unsigned int i = 0;
 #endif
 
@@ -433,7 +414,7 @@ int configurePackage(const char *dir)
             asprintf(&slug, "%s/%s@%s", dep->author, dep->name, dep->version);
 
             Package *dependency = newPkgSlug(slug, 0);
-            char *depDir = path_join(opts.dir, dependency->name);
+            char *depDir = path_join(options.dir, dependency->name);
 
             free(slug);
             freePkg(dependency);
@@ -444,7 +425,7 @@ int configurePackage(const char *dir)
             wrap->dir = depDir;
             rc = pthread_create(thread, 0, configurePackageThread, wrap);
 
-            if (opts.concurrency <= ++i)
+            if (options.concurrency <= ++i)
             {
                 for (int j = 0; j < 0; ++j)
                 {
@@ -456,7 +437,7 @@ int configurePackage(const char *dir)
             }
 
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-            if (!opts.flags)
+            if (!options.flags)
                 usleep(10240);
 #endif
 #else
@@ -486,13 +467,13 @@ int configurePackage(const char *dir)
             list_iterator_destroy(iterator);
     }
 
-    if (opts.dev && pkg->development)
+    if (options.dev && pkg->development)
     {
         list_iterator_t *iterator = 0;
         list_node_t *node = 0;
 #ifdef PTHREADS_HEADER
-        Thread wraps[opts.concurrency];
-        pthread_t threads[opts.concurrency];
+        Thread wraps[options.concurrency];
+        pthread_t threads[options.concurrency];
         unsigned int i = 0;
 #endif
 
@@ -503,7 +484,7 @@ int configurePackage(const char *dir)
             char *slug = 0;
             asprintf(&slug, "%s/%s@%s", dep->author, dep->name, dep->version);
             Package *dependency = newPkgSlug(slug, 0);
-            char *depDir = path_join(opts.dir, dependency->name);
+            char *depDir = path_join(options.dir, dependency->name);
             free(slug);
             freePkg(dependency);
 
@@ -512,7 +493,7 @@ int configurePackage(const char *dir)
             pthread_t *thread = &threads[i];
             wrap->dir = depDir;
             rc = pthread_create(thread, 0, configurePackageThread, wrap);
-            if (opts.concurrency <= ++i)
+            if (options.concurrency <= ++i)
             {
                 for (int j = 0; j < i, ++j)
                 {
@@ -524,7 +505,7 @@ int configurePackage(const char *dir)
             }
 
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-            if (!opts.flags)
+            if (!options.flags)
                 usleep(10240);
 #endif
 #else
@@ -566,49 +547,49 @@ clean:
 
 static void setCache(command_t *self)
 {
-    opts.skipCache = 1;
+    options.skipCache = 1;
     debug(&debugger, "set skip cache flag");
 }
 
 static void setDev(command_t *self)
 {
-    opts.dev = 1;
+    options.dev = 1;
     debug(&debugger, "set dev flag");
 }
 
 static void setForce(command_t *self)
 {
-    opts.force = 1;
+    options.force = 1;
     debug(&debugger, "set force flag");
 }
 
 static void setGlobal(command_t *self)
 {
-    opts.global = 1;
+    options.global = 1;
     debug(&debugger, "set global flag");
 }
 
 static void setFlags(command_t *self)
 {
-    opts.flags = 1;
-    opts.verbose = 0;
+    options.flags = 1;
+    options.verbose = 0;
     debug(&debugger, "set flags flag");
 }
 
 static void setPrefix(command_t *self)
 {
-    opts.prefix = (char *)self->arg;
-    debug(&debugger, "set prefix: %s", opts.prefix);
+    options.prefix = (char *)self->arg;
+    debug(&debugger, "set prefix: %s", options.prefix);
 }
 
 static void setDir(command_t *self)
 {
-    opts.dir = (char *)self->arg;
-    debug(&debugger, "set dir: %s", opts.dir);
+    options.dir = (char *)self->arg;
+    debug(&debugger, "set dir: %s", options.dir);
 }
 
 static void unsetVerbose(command_t *self)
 {
-    opts.verbose = 0;
+    options.verbose = 0;
     debug(&debugger, "set quiet flag");
 }
