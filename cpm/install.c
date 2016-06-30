@@ -99,7 +99,7 @@ static int installLocalPackages()
     if (fs_exists(file) == -1)
     {
         logger_error("error", "Missing manifest file");
-        printf("Please run 'cpm init' to initialize the project.\n");
+        logger_info("info", "Please run 'cpm init' to initialize the project.\n");
         return 1;
     }
 
@@ -109,32 +109,32 @@ static int installLocalPackages()
     if (json == NULL)
         return 1;
 
-    Package *pkg = newPackage(json, options.verbose);
-    if (pkg == NULL)
+    Package *package = newPackage(json, options.verbose);
+    if (package == NULL)
         goto e1;
 
-    if (pkg->prefix)
-        setenv("PREFIX", pkg->prefix, 1);
+    if (package->prefix)
+        setenv("PREFIX", package->prefix, 1);
 
-    int rc = installDependency(pkg, options.dir, options.verbose);
+    int rc = installDependency(package, options.dir, options.verbose);
+
     if (rc == -1)
         goto e2;
 
     if (options.dev)
     {
-        rc = installDevPackage(pkg, options.dir, options.verbose);
+        rc = installDevPackage(package, options.dir, options.verbose);
         if (rc == -1)
             goto e2;
     }
 
     free(json);
-    freePackage(pkg);
+    freePackage(package);
     return 0;
 
 e2:
-    freePackage(pkg);
+    freePackage(package);
 e1:
-    printf("e1");
     free(json);
     return 1;
 }
@@ -200,15 +200,11 @@ static int installPackage(const char *slug)
     if (package == NULL)
         return -1;
 
-    printf("another delimiter\n");
-
     if (rootPackage && rootPackage->prefix)
     {
         packageOptions.prefix = rootPackage->prefix;
         setPackageOptions(packageOptions);
     }
-
-    printf("root package prefix checked\n");
 
     rc = installRootPackage(package, options.dir, options.verbose);
     if (rc != 0)

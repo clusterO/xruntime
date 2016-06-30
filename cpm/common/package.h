@@ -57,6 +57,13 @@ static void intCurlShare()
             goto clean;             \
     })
 
+#define FREE(field)  \
+    if (field)       \
+    {                \
+        free(field); \
+        field = 0;   \
+    }
+
 #include <libgen.h>
 #include <limits.h>
 #include <stdarg.h>

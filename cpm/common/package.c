@@ -966,49 +966,42 @@ int installDevPackage(Package *pkg, const char *dir, int verbose)
     return install(pkg->development, dir, verbose);
 }
 
-void freePackage(Package *pkg)
+void freePackage(Package *package)
 {
-    if (pkg == NULL)
+
+    if (package == NULL)
         return;
-    if (pkg->refs != 0)
+    if (package->refs != 0)
         return;
 
-#define FREE(k)       \
-    if (pkg->k)       \
-    {                 \
-        free(pkg->k); \
-        pkg->k = 0;   \
-    }
+    FREE(package->author);
+    FREE(package->description);
+    FREE(package->install);
+    FREE(package->json);
+    FREE(package->license);
+    FREE(package->name);
+    FREE(package->makefile);
+    FREE(package->configure);
+    FREE(package->repo);
+    FREE(package->reponame);
+    FREE(package->url);
+    FREE(package->version);
+    FREE(package->flags);
 
-    FREE(author);
-    FREE(description);
-    FREE(install);
-    FREE(json);
-    FREE(license);
-    FREE(name);
-    FREE(makefile);
-    FREE(configure);
-    FREE(repo);
-    FREE(reponame);
-    FREE(url);
-    FREE(version);
-    FREE(flags);
-#undef FREE
+    if (package->src)
+        list_destroy(package->src);
+    package->src = 0;
 
-    if (pkg->src)
-        list_destroy(pkg->src);
-    pkg->src = 0;
+    if (package->dependencies)
+        list_destroy(package->dependencies);
+    package->dependencies = 0;
 
-    if (pkg->dependencies)
-        list_destroy(pkg->dependencies);
-    pkg->dependencies = 0;
+    if (package->development)
+        list_destroy(package->development);
+    package->development = 0;
 
-    if (pkg->development)
-        list_destroy(pkg->development);
-    pkg->development = 0;
-
-    free(pkg);
-    pkg = 0;
+    free(package);
+    package = 0;
 }
 
 static int fetchFile(Package *pkg, const char *dir, char *file, int verbose)
@@ -1367,22 +1360,23 @@ static inline int install(list_t *list, const char *dir, int verbose)
     {
         Dependency *dep = NULL;
         char *slug = NULL;
-        Package *pkg = NULL;
+        Package *package = NULL;
         int error = 1;
 
         dep = (Dependency *)node->val;
         slug = buildSlug(dep->author, dep->name, dep->version);
+
         if (slug == NULL)
             goto cleanLoop;
 
-        pkg = newPackageSlug(slug, verbose);
-        if (pkg == NULL)
+        package = newPackageSlug(slug, verbose);
+        if (package == NULL)
             goto cleanLoop;
 
-        if (installRootPackage(pkg, dir, verbose) == -1)
+        if (installRootPackage(package, dir, verbose) == -1)
             goto cleanLoop;
 
-        list_rpush(freeList, list_node_new(pkg));
+        list_rpush(freeList, list_node_new(package));
         error = 0;
 
     cleanLoop:
@@ -1407,9 +1401,9 @@ clean:
 
     while ((node = list_iterator_new(iterator, LIST_HEAD)))
     {
-        Package *pkg = node->val;
-        if (pkg)
-            freePackage(pkg);
+        Package *package = node->val;
+        if (package)
+            freePackage(package);
     }
 
     list_iterator_destroy(iterator);
