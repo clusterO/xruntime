@@ -32,6 +32,7 @@ typedef struct
 
 static void setOpts(command_t *cmd);
 static void setManifestOpts(command_t *cmd);
+static void getInitCommandOptions(command_t *program, int argc, char **argv);
 static char *basePath();
 static void getInput(char *buffer, size_t s);
 static void readInput(JSON_Object *root, const char *key, const char *defaultValue, const char *output);

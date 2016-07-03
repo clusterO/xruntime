@@ -1,25 +1,17 @@
 #include "install.h"
 
-long pathMax;
 debug_t debugger = {0};
 
 static InstallOptions options = {0};
 static Options packageOptions = {0};
 static Package *rootPackage = NULL;
 
-#ifdef PTHREADS_HEADER
-static void setConcurrency(command_t *self)
-{
-    if (self->arg)
-    {
-        options.concurrency = atol(self->arg);
-        debug(&debugger, "set concurrency: %lu", options.concurrency);
-    }
-}
-#endif
+long pathMax;
 
 int main(int argc, char **argv)
 {
+    command_t program;
+
     options.verbose = 1;
     options.dev = 0;
 #ifdef _WIN32
@@ -27,15 +19,17 @@ int main(int argc, char **argv)
 #else
     options.dir = "./deps";
 #endif
+
+#ifdef PATH_MAX
+    pathMax = PATH_MAX;
+#elif defined(_PC_PATH_MAX)
+    pathMax = pathconf(options.dir, _PC_PATH_MAX);
+#else
+    pathMax = 4096;
+#endif
+
     if (options.prefix)
     {
-#ifdef PATH_MAX
-        pathMax = PATH_MAX;
-#elif defined(_PC_PATH_MAX)
-        pathMax = pathconf(options.dir, _PC_PATH_MAX);
-#else
-        pathMax = 4096;
-#endif
         char prefix[pathMax];
         memset(prefix, 0, pathMax);
         realpath(options.prefix, prefix);
@@ -46,12 +40,8 @@ int main(int argc, char **argv)
     }
 
     debug_init(&debugger, "install");
-
-    if (createCache(PACKAGE_CACHE_TIME) != 0)
-        return -1;
-
-    command_t program;
-    getCommandOptions(&program, argc, argv);
+    createCache(PACKAGE_CACHE_TIME); // Test on return value
+    getInstallCommandOptions(&program, argc, argv);
     debug(&debugger, "%d arguments", program.argc);
 
     if (curl_global_init(CURL_GLOBAL_ALL) != 0)
@@ -230,27 +220,6 @@ clean:
     return rc;
 }
 
-static void getCommandOptions(command_t *program, int argc, char **argv)
-{
-    command_init(program, "install", VERSION);
-    program->usage = "[options] [name <>]";
-
-    command_option(program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
-    command_option(program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
-    command_option(program, "-q", "--quiet", "Disable verbose", unsetVerbose);
-    command_option(program, "-d", "--dev", "install develmopent dependency", setDev);
-    command_option(program, "-S", "--save", "Save dependency in manifest.json", setSave);
-    command_option(program, "-D", "--save-dev", "Save develmopent dependency to manifest.json", setSaveDev);
-    command_option(program, "-f", "--force", "Force the action", setForce);
-    command_option(program, "-c", "--skip-cache", "Skip cache when installing", setSkipCache);
-    command_option(program, "-g", "--global", "Global install", setGlobal);
-    command_option(program, "-t", "--token <token>", "Set access token", setToken);
-#ifdef PTHREADS_HEADER
-    command_option(&program, "-C", "--concurrency <number>", "Set concurrency", setConcurrency);
-#endif
-    command_parse(program, argc, argv);
-}
-
 static int writeDependency(Package *pkg, char *prefix)
 {
     const char *file = "manifest.json";
@@ -288,31 +257,31 @@ static int saveDevDependency(Package *pkg)
     return writeDependency(pkg, "develmopent");
 }
 
-static void setDir(command_t *self)
+void setDir(command_t *self)
 {
     options.dir = (char *)self->arg;
     debug(&debugger, "set dir: %s", options.dir);
 }
 
-static void setPrefix(command_t *self)
+void setPrefix(command_t *self)
 {
     options.prefix = (char *)self->arg;
     debug(&debugger, "set prefix: %s", options.prefix);
 }
 
-static void setToken(command_t *self)
+void setToken(command_t *self)
 {
     options.token = (char *)self->arg;
     debug(&debugger, "set token: %s", options.token);
 }
 
-static void unsetVerbose(command_t *self)
+void unsetVerbose(command_t *self)
 {
     options.verbose = 0;
     debug(&debugger, "unset verbose");
 }
 
-static void setDev(command_t *self)
+void setDev(command_t *self)
 {
     options.dev = 1;
     debug(&debugger, "set develmopent flag");
@@ -330,13 +299,13 @@ static void setSaveDev(command_t *self)
     debug(&debugger, "set save develmopent flag");
 }
 
-static void setForce(command_t *self)
+void setForce(command_t *self)
 {
     options.force = 1;
     debug(&debugger, "set force flag");
 }
 
-static void setGlobal(command_t *self)
+void setGlobal(command_t *self)
 {
     options.global = 1;
     debug(&debugger, "set global flag");
@@ -346,4 +315,25 @@ static void setSkipCache(command_t *self)
 {
     options.skipCache = 1;
     debug(&debugger, "set skip cache flag");
+}
+
+static void getInstallCommandOptions(command_t *program, int argc, char **argv)
+{
+    command_init(program, "install", VERSION);
+    program->usage = "[options] [name <>]";
+
+    command_option(program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
+    command_option(program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
+    command_option(program, "-q", "--quiet", "Disable verbose", unsetVerbose);
+    command_option(program, "-d", "--dev", "install develmopent dependency", setDev);
+    command_option(program, "-S", "--save", "Save dependency in manifest.json", setSave);
+    command_option(program, "-D", "--save-dev", "Save develmopent dependency to manifest.json", setSaveDev);
+    command_option(program, "-f", "--force", "Force the action", setForce);
+    command_option(program, "-c", "--skip-cache", "Skip cache when installing", setSkipCache);
+    command_option(program, "-g", "--global", "Global install", setGlobal);
+    command_option(program, "-t", "--token <token>", "Set access token", setToken);
+#ifdef PTHREADS_HEADER
+    command_option(program, "-C", "--concurrency <number>", "Set concurrency", setConcurrency);
+#endif
+    command_parse(program, argc, argv);
 }

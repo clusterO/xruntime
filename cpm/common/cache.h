@@ -1,5 +1,5 @@
-#ifndef CPM_CACHE_HEADER
-#define CPM_CACHE_HEADER
+#ifndef _CPM_CACHE_HEADER
+#define _CPM_CACHE_HEADER
 
 #ifdef _WIN32
 #define PATH getenv("AppData")
@@ -30,10 +30,10 @@
 #include "../libs/rimraf.h"
 #include "../libs/copy.h"
 
+extern int createCache(time_t);
 extern const char *getCachePath();
 extern int initCache(void);
 extern const char *cacheMetaPath();
-extern int createCache(time_t);
 extern int cacheConfigExists(char *, char *, char *);
 extern char *getCacheConfig(char *, char *, char *);
 extern int setCacheConfig(char *, char *, char *, char *);

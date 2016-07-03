@@ -1,5 +1,7 @@
 #include "search.h"
 
+debug_t debugger;
+
 static int color;
 static int cache;
 static int json;
@@ -10,18 +12,10 @@ int main(int argc, char **argv)
     cache = 1;
 
     debug_init(&debugger, "search");
+    createCache(SEARCH_CACHE_TIME);
 
-    ccInit(SEARCH_CACHE_TIME);
-
-    // to be moved, commun commander
     command_t program;
-    command_init(&program, "search", VERSION);
-    program.usage = "[options] [query <>]";
-
-    command_option(&program, "-n", "--no-color", "No color", unsetColor);
-    command_option(&program, "-c", "--skip-cache", "Skipt cache search", unsetCache);
-    command_option(&program, "-j", "--json", "Generate JSON output", setJson);
-    command_parse(&program, argc, argv);
+    getSearchCommandOptions(&program, argc, argv);
 
     for (int i = 0; i < program.argc; i++)
         case_lower(program.argv[i]);
@@ -29,8 +23,7 @@ int main(int argc, char **argv)
     cc_color_t highlightColor = color ? CC_FG_DARK_GREEN : CC_FG_NONE;
     cc_color_t textColor = color ? CC_FG_GRAY : CC_FG_NONE;
 
-    // look in the cache
-    char *html = cacheSearch();
+    char *html = cacheSearch(); // Search NPM !!
     if (html == NULL)
     {
         command_free(&program);
@@ -38,14 +31,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    list_t *pkgs = wiki_registry_parse(html);
+    // need FIX
+    list_t *packages = wiki_registry_parse(html);
     free(html);
 
-    debug(&debugger, "found %zu packages", pkgs->len);
+    debug(&debugger, "found %zu packages", packages->len);
 
     list_node_t *node;
-    list_iterator_t *iterator = list_iterator_new(pkgs, LIST_HEAD);
-
+    list_iterator_t *iterator = list_iterator_new(packages, LIST_HEAD);
     JSON_Array *jsonList = NULL;
     JSON_Value *jsonListRoot = NULL;
 
@@ -55,20 +48,19 @@ int main(int argc, char **argv)
         jsonList = json_value_get_array(jsonListRoot);
     }
 
-    printf("\n");
-
     while ((node = list_iterator_next(iterator)))
     {
-        wiki_package_t *pkg = (wiki_package_t *)node->val;
-        if (matches(program.argc, program.argv, pkg))
-            if (json)
-                addPkgToJson(pkg, jsonList);
-            else
-                showPkg(pkg, highlightColor, textColor);
-        else
-            debug(&debugger, "skipped package %s", pkg->repo);
+        wiki_package_t *package = (wiki_package_t *)node->val;
 
-        wiki_package_free(pkg);
+        if (matches(program.argc, program.argv, package))
+            if (json)
+                addPkgToJson(package, jsonList);
+            else
+                showPkg(package, highlightColor, textColor);
+        else
+            debug(&debugger, "skipped package %s", package->repo);
+
+        wiki_package_free(package);
     }
 
     if (json)
@@ -80,8 +72,9 @@ int main(int argc, char **argv)
     }
 
     list_iterator_destroy(iterator);
-    list_destroy(pkgs);
+    list_destroy(packages);
     command_free(&program);
+
     return 0;
 }
 
@@ -100,7 +93,7 @@ static void setJson()
     json = 1;
 }
 
-static int matches(int count, char *args[], wiki_package_t *pkg)
+static int matches(int count, char *args[], wiki_package_t *package)
 {
     if (count == 0)
         return 1;
@@ -111,13 +104,13 @@ static int matches(int count, char *args[], wiki_package_t *pkg)
     char *href = NULL;
     int rc = 0;
 
-    name = pkgName(pkg->repo);
+    name = packageName(package->repo);
     COMPARE(name);
-    description = strdup(pkg->description);
+    description = strdup(package->description);
     COMPARE(description);
-    repo = strdup(pkg->repo);
+    repo = strdup(package->repo);
     COMPARE(repo);
-    href = strdup(pkg->href);
+    href = strdup(package->href);
     COMPARE(href);
 
 clean:
@@ -128,9 +121,9 @@ clean:
 
 static char *cacheSearch()
 {
-    if (ccSearchExists() && cache)
+    if (cacheSearchExists() && cache)
     {
-        char *data = ccGetSearch();
+        char *data = getCacheSearch();
         if (data)
             return data;
 
@@ -139,6 +132,7 @@ static char *cacheSearch()
 
 setCache:
     debug(&debugger, "Setting cache from %s", NPM_URL);
+
     http_get_response_t *res = http_get(NPM_URL);
     if (!res->ok)
         return NULL;
@@ -149,7 +143,7 @@ setCache:
 
     http_get_free(res);
 
-    ccSetSearch(html);
+    setCacheSearch(html);
     debug(&debugger, "Save cache");
 
     return html;
@@ -175,4 +169,16 @@ static void addPkgToJson(const wiki_package_t *pkg, JSON_Array *jsonList)
     json_object_set_string(jsonPkg, "description", pkg->description);
     json_object_set_string(jsonPkg, "category", pkg->category);
     json_array_append_value(jsonList, jsonPkgRoot);
+}
+
+static void getSearchCommandOptions(command_t *program, int argc, char **argv)
+{
+    command_init(program, "search", VERSION);
+    program->usage = "[options] [name <>]";
+
+    command_option(program, "-n", "--no-color", "No color", unsetColor);
+    command_option(program, "-c", "--skip-cache", "Skipt cache search", unsetCache);
+    command_option(program, "-j", "--json", "Generate JSON output", setJson);
+
+    command_parse(program, argc, argv);
 }

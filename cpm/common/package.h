@@ -1,5 +1,5 @@
-#ifndef CPM_PACKAGE_HEADER
-#define CPM_PACKAGE_HEADER
+#ifndef _CPM_PACKAGE_HEADER
+#define _CPM_PACKAGE_HEADER
 
 #ifndef VERSION
 #define VERSION "master"

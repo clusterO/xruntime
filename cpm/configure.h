@@ -21,7 +21,7 @@
 #define realpath(p, rp) _fullpath(p, rp, strlen(p))
 #endif
 
-// move to source file, or to upper file for communs
+// Enhance - move to source file, or to upper file for common
 #ifdef PTHREADS_HEADER
 static void setConcurrency(command_t *self)
 {
@@ -33,7 +33,7 @@ static void setConcurrency(command_t *self)
 }
 #endif
 
-// move to source file, or to upper file for communs
+// Enhance - move to source file, or to upper file for common
 #ifdef PTHREADS_HEADER
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -72,6 +72,7 @@ void *configurePackageThread(void *arg)
 #include "libs/trim.h"
 #include "common/cache.h"
 #include "common/package.h"
+#include "install.h"
 
 typedef struct
 {
@@ -89,14 +90,7 @@ typedef struct
 } ConfigOptions;
 
 static void setCache(command_t *self);
-static void setDev(command_t *self);
-static void setForce(command_t *self);
-static void setGlobal(command_t *self);
 static void setFlags(command_t *self);
-static void setPrefix(command_t *self);
-static void setDir(command_t *self);
-static void unsetVerbose(command_t *self);
-
-int configurePackage(const char *dir);
+static int configurePackage(const char *dir);
 
 #endif

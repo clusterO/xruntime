@@ -45,14 +45,15 @@
 #include "libs/strdup.h"
 #include "libs/trim.h"
 #include "libs/which.h"
+#include "libs/commander.h"
 
 static const char *usage = "usage: cpm -h | --help\nusage: cpm -v | -V";
 
-static void compareVersions(const JSON_Object *res, const char *marker);
 static bool checkRelease(const char *path);
+static void compareVersions(const JSON_Object *res, const char *marker);
 static void checkNewReleases();
 static char *getFullCommand(char *cmd);
-static int processCommand(char *cmd, char *args, char *argv, int argc);
+static int getCpmCommandOptions(command_t *program, char *args, char *argv, int argc);
 static int executeCommand(char *cmd, char **argv, int argc);
 static int executeInstalledCommand(char *cmd, char *args);
 

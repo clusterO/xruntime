@@ -16,6 +16,17 @@
 #define realpath(p, rp) _fullpath(p, rp, strlen(p))
 #endif
 
+#ifdef PTHREADS_HEADER
+static void setConcurrency(command_t *self)
+{
+    if (self->arg)
+    {
+        options.concurrency = atol(self->arg);
+        debug(&debugger, "set concurrency: %lu", options.concurrency);
+    }
+}
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,14 +68,19 @@ static void setDev(command_t *self);
 static void setSave(command_t *self);
 static void setSaveDev(command_t *self);
 static void setForce(command_t *self);
-static void setGlobal(command_t *self);
 static void setSkipCache(command_t *self);
-static void getCommandOptions(command_t *program, int argc, char **argv);
+static void getInstallCommandOptions(command_t *program, int argc, char **argv);
 static int writeDependency(Package *pkg, char *prefix);
 static int saveDependency(Package *pkg);
 static int saveDevDependency(Package *pkg);
 static int installLocalPackages();
 static int installPackage(const char *slug);
 static int installPackages(int n, char **pkgs);
+void setDir(command_t *self);
+void setPrefix(command_t *self);
+void setToken(command_t *self);
+void unsetVerbose(command_t *self);
+void setDev(command_t *self);
+void setGlobal(command_t *self);
 
 #endif

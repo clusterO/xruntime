@@ -16,7 +16,7 @@
 #define realpath(p, rp) _fullpath(p, rp, strlen(p))
 #endif
 
-// to move
+// Enhance - to be moved to a larger scope
 #ifdef PTHREADS_HEADER
 static void setConcurrency(command_t *self)
 {
@@ -43,8 +43,7 @@ static void setConcurrency(command_t *self)
 #include "libs/commander.h"
 #include "common/cache.h"
 #include "common/package.h"
-
-debug_t debugger = {0};
+#include "install.h" // used functions should move to common
 
 typedef struct
 {
@@ -62,10 +61,6 @@ typedef struct
 
 static void setSlug(command_t *self);
 static void setTag(command_t *self);
-static void setPrefix(command_t *self);
-static void setToken(command_t *self);
-static void unsetVerbose(command_t *self);
-static void setForce(command_t *self);
 static int installPackage(const char *slug);
 
 #endif

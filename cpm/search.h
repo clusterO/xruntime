@@ -47,14 +47,13 @@
 #include "common/package.h"
 #include "common/cache.h"
 
-debug_t debugger;
-
 static char *cacheSearch();
-static int matches(int count, char *args[], wiki_package_t *pkg);
-static void showPkg(const wiki_package_t *pkg, cc_color_t highlightColor, cc_color_t textColor);
-static void addPkgToJson(const wiki_package_t *pkg, JSON_Array *jsonList);
 static void unsetColor();
 static void unsetCache();
 static void setJson();
+static void showPkg(const wiki_package_t *pkg, cc_color_t highlightColor, cc_color_t textColor);
+static void addPkgToJson(const wiki_package_t *pkg, JSON_Array *jsonList);
+static void getSearchCommandOptions(command_t *program, int argc, char **argv);
+static int matches(int count, char *args[], wiki_package_t *pkg);
 
 #endif

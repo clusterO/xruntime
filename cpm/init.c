@@ -11,12 +11,8 @@ int main(int argc, char **argv)
     debug(&debugger, "init");
 
     command_t program;
-    command_init(&program, "init", VERSION);
     program.usage = "[options]";
-    command_option(&program, "-q", "--quiet", "disable verbose", setOpts);
-    command_option(&program, "-M", "--manifest <filename>", "name your manifest file. (default manifest.json)", setManifestOpts);
-    command_parse(&program, argc, argv);
-
+    getInitCommandOptions(&program, argc, argv);
     debug(&debugger, "%d arguments", program.argc);
 
     JSON_Value *json = json_value_init_object();
@@ -96,18 +92,6 @@ static void readInput(JSON_Object *root, const char *key, const char *defaultVal
     json_object_set_string(root, key, value);
 }
 
-static void setOpts(command_t *cmd)
-{
-    options.verbose = 0;
-    debug(&debugger, "set quiet flag");
-}
-
-static void setManifestOpts(command_t *cmd)
-{
-    options.manifest = (char *)cmd->arg;
-    debug(&debugger, "set manifest: %s", options.manifest);
-}
-
 static void getInput(char *buffer, size_t s)
 {
     size_t length = 0;
@@ -133,4 +117,26 @@ static inline size_t writeManifest(const char *manifest, const char *str, size_t
     fclose(file);
 
     return length - wr;
+}
+
+static void setOpts(command_t *cmd)
+{
+    options.verbose = 0;
+    debug(&debugger, "set quiet flag");
+}
+
+static void setManifestOpts(command_t *cmd)
+{
+    options.manifest = (char *)cmd->arg;
+    debug(&debugger, "set manifest: %s", options.manifest);
+}
+
+static void getInitCommandOptions(command_t *program, int argc, char **argv)
+{
+    command_init(program, "init", VERSION);
+    program->usage = "[options] [name <>]";
+
+    command_option(program, "-q", "--quiet", "disable verbose", setOpts);
+    command_option(program, "-M", "--manifest <filename>", "name your manifest file. (default manifest.json)", setManifestOpts);
+    command_parse(program, argc, argv);
 }

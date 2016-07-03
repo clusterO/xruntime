@@ -16,6 +16,7 @@ int initCache(void)
     sprintf(cachePath, CACHE "/meta", PATH);
     if (dirExists(cachePath) != 0)
         return -1;
+
     return 0;
 }
 

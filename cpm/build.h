@@ -21,7 +21,7 @@
 #define realpath(p, rp) _fullpath(p, rp, strlen(p))
 #endif
 
-// to be moved
+// Enhance - to be moved
 #ifdef PTHREADS_HEADER
 static void setConcurency(command_t *self)
 {
@@ -33,7 +33,7 @@ static void setConcurency(command_t *self)
 }
 #endif
 
-// to be moved
+// Enhance - to be moved
 #ifdef PTHREADS_HEADER
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -73,6 +73,7 @@ void *buildPackageThread(void *arg)
 #include "libs/path-join.h"
 #include "libs/str-flatten.h"
 #include "libs/trim.h"
+#include "install.h"
 
 typedef struct
 {
@@ -91,15 +92,8 @@ typedef struct
 } BuildOptions;
 
 static void setCache(command_t *self);
-static void setDev(command_t *self);
-static void setForce(command_t *self);
-static void setGlobal(command_t *self);
 static void setClean(command_t *self);
 static void setTest(command_t *self);
-static void setPrefix(command_t *self);
-static void setDir(command_t *self);
-static void unsetVerbose(command_t *self);
-
-int buildPackage(const char *dir);
+static int buildPackage(const char *dir);
 
 #endif

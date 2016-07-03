@@ -1,20 +1,24 @@
 #include "update.h"
 
+debug_t debugger = {0};
+
 static UpdateOptions options = {0};
 static Options packageOptions = {0};
 static Package *rootPackage = NULL;
 
 int main(int argc, char **argv)
 {
+    command_t program;
     long pathMax;
+    int code;
 
+    options.verbose = 1;
+    options.dev = 0;
 #ifdef _WIN32
     options.dir = ".\\deps";
 #else
     options.dir = "./deps";
 #endif
-    options.verbose = 1;
-    options.dev = 0;
 
 #ifdef PATH_MAX
     pathMax = PATH_MAX;
@@ -25,31 +29,13 @@ int main(int argc, char **argv)
 #endif
 
     debug_init(&debugger, "update");
-
-    ccInit(PACKAGE_CACHE_TIME);
-
-    // move to commander
-    command_t program;
-    command_init(&program, "update", VERSION);
-    program.usage = "[options] [name <>]";
-
-    command_option(&program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
-    command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
-    command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
-    command_option(&program, "-d", "--dev", "Install development dependencies", setDev);
-    command_option(&program, "-t", "--token <token>", "Set access token", setToken);
-
-#ifdef PTHREADS_HEADER
-    command_option(&program, "-C", "--concurrency", "Set concurrency <number>", setConcurrency);
-#endif
-    command_parse(&program, argc, argv);
-
+    createCache(PACKAGE_CACHE_TIME); // shouldn't be declared once at CPM or Init!
+    getUpdateCommandOptions(&program, argc, argv);
     debug(&debugger, "%d arguments", program.argc);
 
     if (curl_global_init(CURL_GLOBAL_ALL) != 0)
         logger_error("error", "Failed to init cURL");
 
-    // DRY
     if (options.prefix)
     {
         char prefix[pathMax];
@@ -61,19 +47,16 @@ int main(int argc, char **argv)
         memcpy((void *)options.prefix, prefix, size);
     }
 
-    ccInit(PACKAGE_CACHE_TIME);
-
     packageOptions.skipCache = 1;
     packageOptions.prefix = options.prefix;
     packageOptions.global = 0;
     packageOptions.force = 1;
     packageOptions.token = options.token;
-
 #ifdef PTHREADS_HEADER
     packageOptions.concurrency = options.concurrency;
 #endif
 
-    setPkgOptions(packageOptions);
+    setPackageOptions(packageOptions);
 
     if (options.prefix)
     {
@@ -83,201 +66,31 @@ int main(int argc, char **argv)
 
     setenv("FORCE", "1", 1);
 
-    int code = program.argc == 0 ? installLocalPackages() : installPackages(program.argc, program.argv);
+    if (program.argc == 0)
+        code = installLocalPackages();
+    else
+        code = installPackages(program.argc, program.argv);
 
     curl_global_cleanup();
     cleanPkgs();
     command_free(&program);
+
     return code;
 }
 
-// DRY installLocalpages, writeDeps, installPackage, installPackages
-static int installLocalPackages()
+static void getUpdateCommandOptions(command_t *program, int argc, char **argv)
 {
-    const char *file = "manifest.json";
+    command_init(program, "update", VERSION);
+    program->usage = "[options] [name <>]";
 
-    if (fs_exists(file) == -1)
-    {
-        logger_error("error", "Missing config file");
-        return 1;
-    }
-
-    debug(&debugger, "reading local config file");
-    char *json = fs_read(file);
-    if (json == NULL)
-        return 1;
-
-    Package *pkg = newPkg(json, options.verbose);
-    if (pkg == NULL)
-        goto e1;
-    if (pkg->prefix)
-        setenv("PREFIX", pkg->prefix, 1);
-
-    int rc = installDeps(pkg, options.dir, options.verbose);
-    if (rc == -1)
-        goto e2;
-
-    if (options.dev)
-    {
-        rc = installDev(pkg, options.dir, options.verbose);
-        if (rc == -1)
-            goto e2;
-    }
-
-    free(json);
-    freePkg(pkg);
-    return 0;
-
-e2:
-    freePkg(pkg);
-e1:
-    free(json);
-    return 1;
-}
-
-static int writeDeps(Package *pkg, char *prefix)
-{
-    const char *file = "manifest.json";
-    JSON_Value *pkgJson = json_parse_file(file);
-    JSON_Object *pkgJsonObj = json_object(pkgJson);
-    JSON_Value *newDep = NULL;
-
-    if (pkgJson == NULL || pkgJsonObj == NULL)
-        return 1;
-
-    JSON_Object *dep = json_object_dotget_object(pkgJsonObj, prefix);
-    if (dep == NULL)
-    {
-        newDep = json_value_init_object();
-        dep = json_value_get_object(newDep);
-        json_object_set_value(pkgJsonObj, prefix, newDep);
-    }
-
-    json_object_set_string(dep, pkg->repo, pkg->version);
-
-    int rc = json_serialize_to_file_pretty(pkgJson, file);
-    json_value_free(pkgJson);
-    return rc;
-}
-
-static int installPackage(const char *slug)
-{
-    Package *pkg = NULL;
-    int rc;
-    long pathMax;
-
-#ifdef PATH_MAX
-    pathMax = PATH_MAX;
-#elif defined(_PC_PATH_MAX)
-    pathMax = pathconf(slug, _PC_PATH_MAX);
-#else
-    pathMax = 4096;
+    command_option(program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
+    command_option(program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
+    command_option(program, "-q", "--quiet", "Disable verbose", unsetVerbose);
+    command_option(program, "-d", "--dev", "Install development dependencies", setDev);
+    command_option(program, "-t", "--token <token>", "Set access token", setToken);
+#ifdef PTHREADS_HEADER
+    command_option(program, "-C", "--concurrency", "Set concurrency <number>", setConcurrency);
 #endif
 
-    if (!rootPackage)
-    {
-        const char *name = "manifest.json";
-        char *json = fs_read(name);
-
-        if (json)
-            rootPackage = newPkg(json, options.verbose);
-    }
-
-    if (slug[0] == '.')
-        if (strlen(slug) == 1 || (slug[1] == '/' && strlen(slug)))
-        {
-            char dir[pathMax];
-            realpath(slug, dir);
-            slug = dir;
-            return installLocalPackages();
-        }
-
-    if (fs_exists(slug) == 0)
-    {
-        fs_stats *stats = fs_stat(slug);
-        if (stats != NULL && (S_IFREG == (stats->st_mode & S_IFMT)
-#if defined(__unix__) || defined(__linux__) || defined(_POSIX_VERSION)
-                              || S_IFLNK == (stats->st_mode & S_IFMT)
-#endif
-                                  ))
-        {
-            free(stats);
-            return installLocalPackages();
-        }
-
-        if (stats)
-            free(stats);
-    }
-
-    if (!pkg)
-        pkg = newPkgSlug(slug, options.verbose);
-
-    if (pkg == NULL)
-        return -1;
-
-    if (rootPackage && rootPackage->prefix)
-    {
-        packageOptions.prefix = rootPackage->prefix;
-        setPkgOptions(packageOptions);
-    }
-
-    rc = installPkg(pkg, options.dir, options.verbose);
-    if (rc != 0)
-        goto clean;
-
-    if (rc == 0 && options.dev)
-    {
-        rc = installDev(pkg, options.dir, options.verbose);
-        if (rc != 0)
-            goto clean;
-    }
-
-    if (pkg->repo == 0 || strcmp(slug, pkg->repo) != 0)
-        pkg->repo = strdup(slug);
-
-clean:
-    freePkg(pkg);
-    return rc;
-}
-
-static int installPackages(int n, char **pkgs)
-{
-    for (int i = 0; i < n; i++)
-    {
-        debug(&debugger, "install %s (%d)", pkgs[i], i);
-        if (installPackage(pkgs[i]) == -1)
-            return 1;
-    }
-
-    return 0;
-}
-
-static void setDir(command_t *self)
-{
-    options.dir = (char *)self->arg;
-    debug(&debugger, "set dir: %s", options.dir);
-}
-
-static void setToken(command_t *self)
-{
-    options.token = (char *)self->arg;
-    debug(&debugger, "set token: %s", options.token);
-}
-
-static void setPrefix(command_t *self)
-{
-    options.prefix = (char *)self->arg;
-    debug(&debugger, "set prefix: %s", options.prefix);
-}
-
-static void unsetVerbose(command_t *self)
-{
-    options.verbose = 0;
-    debug(&debugger, "unset verbose");
-}
-
-static void setDev(command_t *self)
-{
-    options.dev = 1;
-    debug(&debugger, "set development flag");
+    command_parse(program, argc, argv);
 }

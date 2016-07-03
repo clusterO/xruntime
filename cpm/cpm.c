@@ -4,21 +4,17 @@ debug_t debugger;
 
 int main(int argc, char **argv)
 {
+    command_t program;
     char *cmd = argv[1];
     char *args = NULL;
     int rc = 1;
 
     debug_init(&debugger, "cmp");
-
     initCache();
     checkNewReleases();
+    getCpmCommandOptions(&program, args, argv, argc);
+    executeCommand(cmd, argv, argc); // cmd to be replaced with program
 
-    if (processCommand(cmd, args, argv, argc) != 1)
-        return;
-
-    cmd = getFullCommand(cmd);
-
-    rc = executeCommand(cmd, argv, argc);
     if (rc > 255)
         rc = 1;
 
@@ -31,6 +27,38 @@ static void compareVersions(const JSON_Object *res, const char *marker)
 
     if (strcmp(VERSION, latestVersion) != 0)
         logger_info("info", "New version is available. use upgrade --tag %s", latestVersion);
+}
+
+static int getCpmCommandOptions(command_t *program, char *args, char *argv, int argc)
+{
+    command_init(program, "cpm", VERSION);
+    program->usage = "[options] [name <>]";
+
+    command_option(program, NULL, NULL, "", printf("%s\n", usage));
+    command_option(program, "-v", "version", "Show version", printf("VERSION: %s\n", VERSION));
+    command_option(program, "-V", "version", "Show version", printf("VERSION: %s\n", VERSION));
+    command_option(program, "-b", "build", "Build packages", NULL);
+    command_option(program, "-c", "config", "Configure CPM", NULL);
+    command_option(program, "-i", "install  <package | .>", "Install packages", NULL);
+    command_option(program, "-s", "search <package>", "Search if a package exists", NULL);
+    command_option(program, "-u", "update <package | .>", "Update packages to the latest version", NULL);
+    command_option(program, "-g", "upgrade <package | .>", "Upgrade packages", NULL);
+#ifdef PTHREADS_HEADER
+    command_option(program, "-C", "--concurrency", "Set concurrency <number>", setConcurrency);
+#endif
+
+    command_parse(program, argc, argv);
+
+    if (argc >= 3)
+    {
+        args = str_flatten(argv, 2, argc);
+        if (args == NULL)
+            return -1;
+    }
+
+    debug(&debugger, "args: %s", args);
+
+    return 1;
 }
 
 static void checkNewReleases()
@@ -78,6 +106,7 @@ static void checkNewReleases()
 clean:
     if (json)
         json_value_free(json);
+
     free((void *)marker);
     http_get_free(res);
 }
@@ -95,66 +124,11 @@ static bool checkRelease(const char *path)
     return now - modified >= NOTIF_EXPIRATION;
 }
 
-static char *getFullCommand(char *cmd)
-{
-    if (strcmp(cmd, "b") == 0)
-        return strdup("build");
-    if (strcmp(cmd, "c") == 0)
-        return strdup("config");
-    if (strcmp(cmd, "i") == 0)
-        return strdup("install");
-    if (strcmp(cmd, "s") == 0)
-        return strdup("search");
-    if (strcmp(cmd, "u") == 0)
-        return strdup("update");
-    if (strcmp(cmd, "ug") == 0)
-        return strdup("upgrade");
-
-    return cmd;
-}
-
-static int processCommand(char *cmd, char *args, char *argv, int argc)
-{
-    if (cmd == NULL)
-    {
-        printf("%s\n", usage);
-        return 0;
-    }
-
-    if (strncmp(cmd, "-v", 2) == 0 || strncmp(cmd, "-V", 2) == 0 || strncmp(cmd, "--version", 9) == 0)
-    {
-        logger_info("VERSION", VERSION);
-        return 0;
-    }
-
-    if (strcmp(cmd, "help") == 0 || strcmp(cmd, "-h") == 0 || strcmp(cmd, "--help") == 0)
-    {
-        fprintf(stderr, "Help command required.\n");
-        return 0;
-    }
-
-    if (strncmp(cmd, "--", 2) == 0 || strncmp(cmd, "-", 2) == 0)
-    {
-        fprintf(stderr, "Unknown option: \"%s\"\n", cmd);
-        return 0;
-    }
-
-    if (argc >= 3)
-    {
-        args = str_flatten(argv, 2, argc);
-        if (args == NULL)
-            return -1;
-    }
-
-    debug(&debugger, "args: %s", args);
-
-    return 1;
-}
-
 static int executeCommand(char *cmd, char **argv, int argc)
 {
     for (int i = 2; i < argc; i++)
     {
+        // doesn't concat args when full command used
         strcat(cmd, " ");
         strcat(cmd, argv[i]);
     }

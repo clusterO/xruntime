@@ -42,8 +42,7 @@ static void setConcurrency(command_t *self)
 #include "libs/parson.h"
 #include "common/package.h"
 #include "common/cache.h"
-
-debug_t debugger = {0};
+#include "install.h"
 
 typedef struct
 {
@@ -57,14 +56,6 @@ typedef struct
 #endif
 } UpdateOptions;
 
-static void setDir(command_t *self);
-static void setToken(command_t *self);
-static void setPrefix(command_t *self);
-static void unsetVerbose(command_t *self);
-static void setDev(command_t *self);
-static int installLocalPackages();
-static int writeDeps(Package *pkg, char *prefix);
-static int installPackage(const char *slug);
-static int installPackages(int n, char **pkgs);
+static void getUpdateCommandOptions(command_t *program, int argc, char **argv);
 
 #endif
