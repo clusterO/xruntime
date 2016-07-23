@@ -64,6 +64,17 @@
     "curl.h": "c",
     "time.h": "c",
     "http-get.h": "c",
-    "package.h": "c"
+    "package.h": "c",
+    "cpm.h": "c",
+    "trim.h": "c",
+    "*.in": "c",
+    "globals.h": "c",
+    "debug.h": "c",
+    "install.h": "c",
+    "libgen.h": "c",
+    "command.h": "c",
+    "init.h": "c",
+    "search.h": "c",
+    "commander.h": "c"
   }
 }
