@@ -32,8 +32,6 @@ struct Data *getData(int fd, struct Cache *cache, const char *path, char *mimeTy
     return fileData;
 }
 
-char *findBodyStart(char *header) {}
-
 struct Data *notFound(int fd)
 {
     char *filePath = "./serverfiles/404.html";
@@ -50,4 +48,8 @@ struct Data *notFound(int fd)
 
     mimeType = getMimeType(filePath);
     return fileData;
+}
+
+char *findBodyStart(char *header)
+{
 }
