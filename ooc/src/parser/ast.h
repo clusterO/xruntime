@@ -27,8 +27,8 @@ typedef struct {
     // Add more parser-specific variables as needed
 } Parser;
 
-Node* parser_parse(Parser* parser);
 void parser_init(Parser* parser, const char* source_code);
+Node* parser_parse(Parser* parser);
 void ast_free(Node* node);
 void parse_error(const char* message, int line, int column);
 
