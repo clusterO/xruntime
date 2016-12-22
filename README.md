@@ -37,7 +37,7 @@ gcc server.c llist.c hashtable.c cache.c file.c mime.c net.c helpers/request.c -
 - [x] Init & configure
 - [x] Install, Update and upgrade
 - [x] Build process
-- [_] DepSolver (SAT)
+- [x] DepSolver (SAT)
 - [_] CI/CD
 
 #### Design principles
@@ -65,7 +65,7 @@ gcc cpm.c libs/asprintf.c libs/case.c libs/commander.c libs/console-colors.c lib
 
 ## The third phase is to incorporate object oriented and functional programming styles
 
-- [_] OOC [OOC](https://ipfs.io/ipfs/bafykbzacebdwpzy4hih6puwm2vl746vponefnskbolmiuxmcbfjfe2gvnqrie?filename=Axel%20Schreiner%20-%20Object-Oriented%20Programming%20with%20ANSI-C%20%281993%29.pdf)
+- [x] OOC [OOC](https://ipfs.io/ipfs/bafykbzacebdwpzy4hih6puwm2vl746vponefnskbolmiuxmcbfjfe2gvnqrie?filename=Axel%20Schreiner%20-%20Object-Oriented%20Programming%20with%20ANSI-C%20%281993%29.pdf)
 - [_] FC [Functional C](https://ipfs.io/ipfs/bafykbzacedosuw6brb6mpmlwy7pex4kjtzcftrdhjk2thj4ppxtifcbjqckgy?filename=%28International%20Computer%20Science%20Series%29%20P.%20Hartel%2C%20F.%20Muller%20-%20Functional%20C-Addison-Wesley%20%281997%29.pdf)
 - [_] Fix Wall Wextra
 - [_] Functional tests
