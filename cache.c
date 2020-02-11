@@ -4,7 +4,7 @@
 #include "hashtable.h"
 #include "cache.h"
 
-struct cacheEntry *allocateEntry(char *path, char *contentType, void *content, int contentLength) {}
+struct CacheEntry *allocateEntry(char *path, char *contentType, void *content, int contentLength) {}
 void freeEntry(struct CacheEntry *entry) {}
 struct Cache *createCache(int maxSize, int hashSize) {}
 void cput(struct Cache *cache, char *path, char *contentType, void *content, int contentLength) {}
@@ -50,7 +50,7 @@ struct CacheEntry *dllRemoveTail(struct Cache *cache)
     return oldtail;
 }
 
-void freeCache(struct cache *cache)
+void freeCache(struct Cache *cache)
 {
     struct  CacheEntry *entry = cache->head;
     hdestroy(cache->index);

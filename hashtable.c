@@ -12,13 +12,13 @@ struct Htent {
     int keySize;
     int hashedKey;
     void *data;
-}
+};
 
 //ll cleaner
 struct Payload {
     void *arg;
     void (*f)(void *, void *);
-}
+};
 
 void addEntryCount(struct Hashtable *ht, int d)
 {
@@ -59,7 +59,7 @@ struct Hashtable *hcreate(int size, int (*hashf)(void *, int, int))
     return ht;
 }
 
-void freeHtent(void *Htent, void *arg)
+void freeHtent(void *htent, void *arg)
 {
     (void)arg;
     free(htent);
@@ -78,10 +78,10 @@ void hdestroy(struct Hashtable *ht)
 
 void *hput(struct Hashtable *ht, char *key, void *data) 
 {
-    return putBin(ht, key, strlen(key), data);
+    return hputBin(ht, key, strlen(key), data);
 }
 
-void hputBin(struct Hashtable *ht, void *key, int keySize, void *data)
+void *hputBin(struct Hashtable *ht, void *key, int keySize, void *data)
 {
     int index = ht->hashf(key, keySize, ht->size);
     struct llist *llist = ht->bucket[index];
@@ -115,7 +115,7 @@ void *hget(struct Hashtable *ht, char *key)
     return hgetBin(ht, key, strlen(key));
 }
 
-void hgetBin(struct Hashtable *ht, void *key, int keySize)
+void *hgetBin(struct Hashtable *ht, void *key, int keySize)
 {
     int index = ht->hashf(key, keySize, ht->size);
     struct llist *llist = ht->bucket[index];
@@ -155,13 +155,13 @@ void *hdeleteBin(struct Hashtable *ht, void *key, int keySize)
 void forEachPayload(void *vent, void *vpayload)
 {
     struct Htent *ent = vent;
-    struct payload *payload = vpayload;
+    struct Payload *payload = vpayload;
     payload->f(ent->data, payload->arg);
 }
 
 void hforEach(struct Hashtable *ht, void (*f)(void *, void *), void *arg)
 {
-    struct payload payload;
+    struct Payload payload;
     payload.f = f;
     payload.arg = arg;
 

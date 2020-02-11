@@ -4,7 +4,7 @@
 struct Node {
     void *data;
     struct Node *next;
-}
+};
 
 struct llist *llcreate(void) 
 {
@@ -13,7 +13,7 @@ struct llist *llcreate(void)
 
 void lldestroy(struct llist *llist)
 {
-    struct Node *n = llist->head;
+    struct Node *n = llist->head, *next;
     while(n != NULL) {
         next = n->next;
         free(n);
@@ -35,7 +35,7 @@ void *llinsert(struct llist *llist, void *data)
     return data;
 }
 
-void llappend(struct llist *llist, void *data)
+void *llappend(struct llist *llist, void *data)
 {
     struct Node *tail = llist->head;
     if(tail == NULL) return NULL;
@@ -86,7 +86,7 @@ void *llfind(struct llist *llist, void *data, int (*cmpfn)(void *, void *))
 
 void *lldelete(struct llist *llist, void *data, int (*cmpfn)(void *, void *))
 {
-    struct Node = llist->head, *prev = NULL;
+    struct Node *n = llist->head, *prev = NULL;
     while(n != NULL) {
         if(cmpfn(data, n->data) == 0) {
             void *data = n->data;
@@ -119,7 +119,7 @@ void llforEach(struct llist *llist, void (*f)(void *, void *), void *arg)
 void **llgetArray(struct llist *llist)
 {
     if(llist->head == NULL) return NULL;
-    void **a = malloc(size *a * llist->count + 1);
+    void **a = malloc(sizeof *a * llist->count + 1);
     struct Node *n;
     int i;
 

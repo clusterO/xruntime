@@ -2,7 +2,7 @@
 #define _LLIST_HEADER_
 
 struct llist {
-	struct node *head;
+	struct Node *head;
 	int count;
 };
 

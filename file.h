@@ -1,12 +1,12 @@
 #ifndef _FILEL_HEADER_
 #define _FILEL_HEADER_
 
-struct data {
+struct Data {
     int size;
     void *data;
 };
 
-extern struct data *loadFile(char *filename);
-extern void freeFile(struct data *data);
+extern struct Data *loadFile(char *filename);
+extern void freeFile(struct Data *data);
 
 #endif

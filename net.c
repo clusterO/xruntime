@@ -38,7 +38,7 @@ int getSocketListner(char *port)
     //Go through interfaces
     for(p = servinfo; p != NULL; p = p->ai_next) { 
         //Make a socket of this one
-        if((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocole)) ==-1) {
+        if((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) ==-1) {
             continue;
         }
         
@@ -51,7 +51,7 @@ int getSocketListner(char *port)
         }
         
         //Bind this socket to this local IP addr
-        if(bind(sockfd, p->ai_addr, p->addrlen) == -1) {
+        if(bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             close(sockfd);
             continue;
         }
