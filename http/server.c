@@ -24,8 +24,11 @@ int response(int fd, char *header, char *contentType, void *body, int contentLen
 {
     const int maxResponseSize = 262144;
     char response[maxResponseSize];
+    time_t time = time(NULL);
+    struct tm *localTime = localtime(&time);
+    char *timestamp = asctime(localTime);
 
-    int responseLength = sprintf(response, "%\nConnection: close\nContent-Type: %s\nContent-Length: %d\n\n%s", header, contentType, contentLength, body);
+    int responseLength = sprintf(response, "%\nConnection: close\nDate %s\nContent-Type: %s\nContent-Length: %d\n\n%s", header, timestamp, contentType, contentLength, body);
     
     int rv = send(fd, response, responseLength, 0);
     if(rv < 0) perror("send");
