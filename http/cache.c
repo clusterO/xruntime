@@ -7,7 +7,24 @@
 struct CacheEntry *allocateEntry(char *path, char *contentType, void *content, int contentLength) {}
 void freeEntry(struct CacheEntry *entry) {}
 struct Cache *createCache(int maxSize, int hashSize) {}
-void cput(struct Cache *cache, char *path, char *contentType, void *content, int contentLength) {}
+
+void cput(struct Cache *cache, char *path, char *contentType, void *content, int contentLength) 
+{
+    struct CacheEntry *entry = allocateEntry(path, contentType, content, contentLength);
+    
+    llinsert(cache, entry);
+    hput(cache->hashtable, path, entry);
+    cache->size++;
+    
+    if(cache->size > cache->maxSize) {
+        struct *tempEntry = llremove(cache);
+        hdelete(cache->hashtable, tempEntry->path);
+        free(tempEntry);
+    }
+
+    freeEntry(entry)
+}
+
 struct CacheEntry *cget(struct Cache *cache, char *path) {}
 
 void dllInsertHead(struct Cache *cache, struct CacheEntry *ce)
