@@ -4,7 +4,20 @@
 #include "hashtable.h"
 #include "cache.h"
 
-struct CacheEntry *allocateEntry(char *path, char *contentType, void *content, int contentLength) {}
+struct CacheEntry *allocateEntry(char *path, char *contentType, void *content, int contentLength) 
+{
+    struct CacheEntry entry = malloc(sizeof(struct CacheEntry));
+
+    entry->path = path;
+    entry->contentType = contentType;
+    entry->contentLength = contentLength;
+    entry->content = content;
+    entry->prev = NULL;
+    entry->next = NULL;
+    
+    return entry;
+}
+
 void freeEntry(struct CacheEntry *entry) {}
 struct Cache *createCache(int maxSize, int hashSize) {}
 
