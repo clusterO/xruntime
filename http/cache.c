@@ -18,8 +18,27 @@ struct CacheEntry *allocateEntry(char *path, char *contentType, void *content, i
     return entry;
 }
 
-void freeEntry(struct CacheEntry *entry) {}
-struct Cache *createCache(int maxSize, int hashSize) {}
+void freeEntry(struct CacheEntry *entry) 
+{
+    entry->prev->next = entry->next;
+    entry->next->prev = entry->prev;
+    entry->prev = NULL;
+    entry->next = NULL;
+    free(entry);
+}
+
+struct Cache *createCache(int maxSize, int hashSize) 
+{
+    struct Cache *cache = malloc(sizeof(struct Cache));
+
+    cache->index = hcreate(hashSize, NULL);
+    cache->head = NULL;
+    cache->tail = NULL;
+    cache->maxSize = maxSize;
+    cache->size = hashSize;
+
+    return cache;
+}
 
 void cput(struct Cache *cache, char *path, char *contentType, void *content, int contentLength) 
 {
@@ -38,7 +57,15 @@ void cput(struct Cache *cache, char *path, char *contentType, void *content, int
     freeEntry(entry)
 }
 
-struct CacheEntry *cget(struct Cache *cache, char *path) {}
+struct CacheEntry *cget(struct Cache *cache, char *path) 
+{
+    struct CacheEntry entry = hget(cache->index, path);
+    if(entry == NULL) return NULL;
+    else {
+        llmove(cache, entry);
+        return entry;
+    }
+}
 
 void dllInsertHead(struct Cache *cache, struct CacheEntry *ce)
 {
