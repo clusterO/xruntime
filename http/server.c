@@ -35,13 +35,10 @@ int response(int fd, char *header, char *contentType, void *body, int contentLen
     return rv;
 }
 
-void getNumber(int fd) 
+void getData(int fd) 
 {
-    int number = rand();
-    char numberAsString[1024];
-    int length = sprintf(numberAsString, "%d", number);
-
-    response(fd, "HTTP/1.1 OK", "text/plain", numberAsString, length);
+    char *data = "SOME DATA";
+    response(fd, "HTTP/1.1 OK", "text/plain", data, sizeof data);
 }
 
 char getFile(int fd, struct Cache *cache, char *path) 
@@ -61,6 +58,7 @@ char getFile(int fd, struct Cache *cache, char *path)
         notFount(fd);
     else {
         mimeType = getMimeType(filePath);
+        cput(cache, filePath, mimeType, fileData->data, fileData->size);
         response(fd, "HTTP/1.1 OK", mimeType, fileData->data, fileData->size);
         free(mimeType);
     }
@@ -105,10 +103,16 @@ void request(int fd, struct Cache *cache)
     char method[1024], path[16384];
     //Implement
     sscanf(request, "%s %s", method, path);
-    if(strcmp("number", path) == 0) getNumber(fd);
-    else if (strcmp("GET", method) == 0) getFile(fd, cache, path);
-    else if (strcmp("POST", method) == 0) return;
-    else notFound(fd); 
+    
+    struct cacheEntry *entry = cget(cache, path);
+    if(entry == NULL) 
+        response(fd, "HTTP/1.1 OK", entry->contentType, entry->contentLength);
+    else {
+        if(strcmp("/data", path) == 0) getData(fd);
+        else if (strcmp("GET", method) == 0) getFile(fd, cache, path);
+        else if (strcmp("POST", method) == 0) return;
+        else notFound(fd);
+    } 
 }
 
 int main(void) 
