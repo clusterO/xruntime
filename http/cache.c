@@ -8,10 +8,11 @@ struct CacheEntry *allocateEntry(char *path, char *contentType, void *content, i
 {
     struct CacheEntry entry = malloc(sizeof(struct CacheEntry));
 
-    entry->path = path;
-    entry->contentType = contentType;
+    entry->path = strdup(path);
+    entry->contentType = strdup(contentType);
     entry->contentLength = contentLength;
-    entry->content = content;
+    entry->content = malloc(contentLength);
+    memcpy(entry->content, content, contentLength);
     entry->prev = NULL;
     entry->next = NULL;
     
@@ -20,10 +21,11 @@ struct CacheEntry *allocateEntry(char *path, char *contentType, void *content, i
 
 void freeEntry(struct CacheEntry *entry) 
 {
-    entry->prev->next = entry->next;
-    entry->next->prev = entry->prev;
-    entry->prev = NULL;
-    entry->next = NULL;
+    free(entry->path);
+    free(entry->contentType);
+    free(entry->content);
+    free(entry->prev);
+    free(entry->next);
     free(entry);
 }
 

@@ -38,7 +38,7 @@ int response(int fd, char *header, char *contentType, void *body, int contentLen
 void getData(int fd) 
 {
     char *data = "SOME DATA";
-    response(fd, "HTTP/1.1 OK", "text/plain", data, sizeof data);
+    response(fd, "HTTP/1.1 200 OK", "text/plain", data, strlen(data));
 }
 
 char getFile(int fd, struct Cache *cache, char *path) 
@@ -54,12 +54,14 @@ char getFile(int fd, struct Cache *cache, char *path)
     
     fileData = loadFilr(filePath);
 
-    if(filePath == NULL)
+    if(filePath == NULL) {
         notFount(fd);
+        return;
+    }
     else {
         mimeType = getMimeType(filePath);
         cput(cache, filePath, mimeType, fileData->data, fileData->size);
-        response(fd, "HTTP/1.1 OK", mimeType, fileData->data, fileData->size);
+        response(fd, "HTTP/1.1 200 OK", mimeType, fileData->data, fileData->size);
         free(mimeType);
     }
 
@@ -106,13 +108,18 @@ void request(int fd, struct Cache *cache)
     
     struct cacheEntry *entry = cget(cache, path);
     if(entry == NULL) 
-        response(fd, "HTTP/1.1 OK", entry->contentType, entry->contentLength);
+        response(fd, "HTTP/1.1 200 OK", entry->contentType, entry->contentLength);
     else {
         if(strcmp("/data", path) == 0) getData(fd);
         else if (strcmp("GET", method) == 0) getFile(fd, cache, path);
         else if (strcmp("POST", method) == 0) return;
-        else notFound(fd);
+        else {
+            notFound(fd);
+            return;
+        }
     } 
+
+    free(entry);
 }
 
 int main(void) 
