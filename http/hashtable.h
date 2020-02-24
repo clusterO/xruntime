@@ -12,11 +12,11 @@ struct Hashtable {
 extern struct Hashtable *hcreate(int size, int (*hashf)(void *, int, int));
 extern void hdestroy(struct Hashtable *ht);
 extern void *hput(struct Hashtable *ht, char *key, void *data);
-extern void *hputBin(struct Hashtable *ht, void *key, int key_size, void *data);
+extern void *hputBin(struct Hashtable *ht, void *key, int keySize, void *data);
 extern void *hget(struct Hashtable *ht, char *key);
-extern void *hgetBin(struct Hashtable *ht, void *key, int key_size);
+extern void *hgetBin(struct Hashtable *ht, void *key, int keySize);
 extern void *hdelete(struct Hashtable *ht, char *key);
-extern void *hdeleteBin(struct Hashtable *ht, void *key, int key_size);
+extern void *hdeleteBin(struct Hashtable *ht, void *key, int keySize);
 extern void hforEach(struct Hashtable *ht, void (*f)(void *, void *), void *arg);
 
 #endif

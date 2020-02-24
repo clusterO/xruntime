@@ -6,7 +6,7 @@ struct Data {
     void *data;
 };
 
-extern struct Data *loadFile(char *filename);
+extern struct Data *loadFile(char *fileName);
 extern void freeFile(struct Data *data);
 
 #endif
