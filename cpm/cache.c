@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 #include "fs.h"
 #include "mkdirp.h"
 #include "cache.h"
@@ -44,7 +45,7 @@ const char ccPath()
     return pkgCachePath;
 }
 
-static int checkDirectory(char *path) 
+static int dirExist(char *path) 
 {
     if(fs_exist(path) != 0)
         return mkdirp(path, 0700);
@@ -54,10 +55,60 @@ static int checkDirectory(char *path)
 int ccInit(void) 
 {
     sprintf(cachePath, CACHE "/meta", PATH);
-    if(checkDirectory(cachePath) != 0)
+    if(dirExist(cachePath) != 0)
         return -1;
     return 0;
 }
+
+const char *ccMetaPath()
+{
+    return cachePath;
+}
+
+int ccCreate(time_t expr)
+{
+    cacheExpiration = expr;
+    sprintf(pkgCachePath, CACHE, "/packages", PATH);
+    sprintf(jsonCachePath, CACHE, "/json", PATH);
+    sprintf(seachCache, CACHE "search.html", PATH);
+
+    if(dirExist(pkgCachePath) != 0) return -1;
+    if(dirExist(jsonCachePath) != 0) return -1;
+    return 0;
+}
+
+static int isExpired(char *cache)
+{
+    
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

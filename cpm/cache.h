@@ -3,6 +3,7 @@
 
 extern int ccCreate(time_t);
 extern int ccInit();
+extern const char *ccMetaPath();
 extern const char *ccPath();
 extern int ccConfigExist(char *, char *, char *);
 extern char *ccGetConfig(char *, char *, char *);
