@@ -5,7 +5,7 @@ extern int ccCreate(time_t);
 extern int ccInit();
 extern const char *ccMetaPath();
 extern const char *ccPath();
-extern int ccConfigExist(char *, char *, char *);
+extern int ccConfigExists(char *, char *, char *);
 extern char *ccGetConfig(char *, char *, char *);
 extern int ccSetConfig(char *, char *, char *, char *);
 extern int ccDeleteConfig(char *, char *, char *);
