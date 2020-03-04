@@ -9,7 +9,7 @@ extern int ccConfigExists(char *, char *, char *);
 extern char *ccGetConfig(char *, char *, char *);
 extern int ccSetConfig(char *, char *, char *, char *);
 extern int ccDeleteConfig(char *, char *, char *);
-extern int ccSearchExist();
+extern int ccSearchExists();
 extern char *ccGetSearch();
 extern int ccSetSearch(char *);
 extern int ccDeleteSearch();

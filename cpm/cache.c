@@ -115,6 +115,61 @@ int ccDeleteConfig(char *author, char *name, char *version)
     return unlink(jsonCache);
 }
 
+int ccSearchExists() 
+{
+    return fs_exists(seachCache) == 0;
+}
+
+char *ccGetSearch()
+{
+    if(ccSearchExists()) return NULL;
+    return fs_read(searchCache);
+}
+
+char ccSetSearch(char *content)
+{
+    return fs_write(searchCache, content);
+}
+
+int ccDeleteSearch() 
+{
+    return unlink(seachCache);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
