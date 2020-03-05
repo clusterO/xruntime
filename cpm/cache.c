@@ -4,6 +4,8 @@
 #include <time.h>
 #include "fs.h"
 #include "mkdirp.h"
+#include "rimraf.h"
+#include "copy.h"
 #include "cache.h"
 
 #ifdef _WIN32
@@ -92,7 +94,7 @@ static int isExpired(char *cache)
 int ccConfigExists(char *author, char *name, char *version)
 {
     GET_JSON_CACHE(author, name, version);
-    return fs_exists(jsonCache) && !isExpired(jsonCache) == 0;
+    return !isExpired(jsonCache) && fs_exists(jsonCache) == 0;
 }
 
 char *ccGetConfig(char *author, char *name, char *version)
@@ -135,6 +137,73 @@ int ccDeleteSearch()
 {
     return unlink(seachCache);
 }
+
+int ccPackageExists(char *author, char *name, char *version) 
+{
+    GET_PKG_CACHE(author, name, version);
+    return !isExpired(pkgCache) && fs_exists(pkgCache) == 0; 
+}
+
+int ccPackageExpired(char *author, char *name, char * version)
+{
+    GET_PKG_CACHE(author, name, version);
+    return isExpired(pkgCache);
+}
+
+int ccSetPackage(char *author, char *name, char *version, char *path)
+{
+    GET_PKG_CACHE(author, name, version);
+    if(fs_exists(pkgCache) == 0) rimraf(pkgCache);
+    return copy_dir(path, pkgCache);
+}
+
+int ccLoadPackage(char *author, char *name, char *version, char *path)
+{
+    GET_PKG_CACHE(author, name, version);
+    if(fs_exists(pkgCache) == -1) return -1;
+    if(isExpired(pkgCache)) {
+        rimraf(pkgCache);
+        return -2;
+    }
+
+    return copy_dir(pkgCache, path);
+}
+
+int ccDeletePackage(char *author, char *name, char *version)
+{
+    GET_PKG_CACHE(author, name, version);
+    return rimraf(pkgCache);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -13,7 +13,7 @@ extern int ccSearchExists();
 extern char *ccGetSearch();
 extern int ccSetSearch(char *);
 extern int ccDeleteSearch();
-extern int ccPackageExist(char *, char *, char *);
+extern int ccPackageExists(char *, char *, char *);
 extern int ccPackageExpired(char *, char *, char * );
 extern int ccLoadPackage(char *, char *, char *, char *);
 extern int ccSetPackage(char *, char *, char *, char *);
