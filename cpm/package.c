@@ -10,6 +10,7 @@
 #include "cache.h"
 #include "package.h"
 #include "hash.h"
+#include "logger.h"
 
 #ifndef DEFAULT_REPO
 #define DEFAULT_REPO "master"
@@ -152,6 +153,27 @@ static inline char *buildSlug(const char *author, const char *name, const char *
 
     return slug;
 }
+
+Package *loadPkg(const char *manifest, int verbose)
+{
+    Package *pkt = NULL;
+
+    if(fs_exists(manifest) == -1) {
+        logger_error("error", "Missin %s", manifest);
+        return NULL;
+    }
+
+    logger_info("info", "reading local %s", manifest);
+
+    char *json = fs_read(manifest);
+    if(json == NULL) goto e1;
+    pkg = newPkg(json, verbose);
+
+e1: free(json);
+
+    return pkg;
+}
+
 
 
 
