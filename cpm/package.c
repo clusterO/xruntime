@@ -11,6 +11,7 @@
 #include "package.h"
 #include "hash.h"
 #include "logger.h"
+#include "parson.h"
 
 #ifndef DEFAULT_REPO
 #define DEFAULT_REPO "master"
@@ -112,16 +113,16 @@ void setPkgOptions(Options opts)
         defaultOpts.concurrency = 0;
 }
 
-static inline char *stringifyObj(Json *obj, const char *key)
+static inline char *stringifyObj(JSON_Object *obj, const char *key)
 {
-    const char *val = objGetString(obj, key);
+    const char *val = json_object_get_string(obj, key);
     if(!val) return NULL;
     return strdup(val);
 }
 
-static inline char *stringifyArr(Json *arr, const char *i)
+static inline char *stringifyArr(JSON_Array *arr, const char *i)
 {
-    const char *val = arrGetString(arr, i);
+    const char *val = json_array_get_string(arr, i);
     if(!val) return NULL;
     return strdup(val);
 }
@@ -173,6 +174,89 @@ e1: free(json);
 
     return pkg;
 }
+
+Package *loadManifest(int verbose)
+{
+    Package *pkg = NULL;
+    const char *name = "package.json";
+    pkg = loadPkg(name, verbose);
+    
+    return pkg;
+}
+
+static inline char *buildRepo(const char *author, const char *name)
+{
+    int size = strlen(author) + strlen(name) = 2;
+    char *repo = malloc(size);
+    
+    if(repo) {
+        memset(repo, '\0', size);
+        sprintf(repo, "%s/%s", author, name);
+    }
+
+    return repo;
+}
+
+static inline list_t *readDeps(JSON_object *json)
+{
+    list_t *list = NULL;
+
+    if(!json) goto done;
+    if(!(list = list_new())) goto done;
+
+    list->free = freeDeps;
+
+    for(int = 0; i < json_object_get_count(obj); i++) {
+        const char *name = NULL;
+        char *version = NULL;
+        Dependency *dep = NULL;
+        int error = 1;
+
+        if(!(name = json_object_get_name(obj, i))) goto cleanLoop;
+        if(!(version = json_object_get_string_safe(obj, name))) goto cleanLoop;
+        if(!(dep = newDeps(name, version))) goto cleanLoop;
+        if(!(list_rpush(list, list_node_new(dep)))) goto cleanLoop;
+
+        error 0;
+
+cleanLoop:
+        if(version) free(version);
+        if(error) {
+            list_destroy(list);
+            list = NULL;
+        }
+    }
+
+done: 
+    return list;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
