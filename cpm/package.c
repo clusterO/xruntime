@@ -71,6 +71,31 @@ static OPTIONS defaultOpts = {
     .token = 0,
 };
 
+#ifdef PTHREADS_HEADER
+static void curlLock(CURL *handle, curl_lock_data data, curl_lock_access access, void *userptr) 
+{
+    pthread_mutex_lock(&lock.mutex);
+}
+
+static void curlUnlock(CURL *handle, curl_lock_data data, curl_lock_access access, void *userptr)
+{
+    pthread_mutex_unlock(&lock_mutex);
+}
+
+static void intCurlShare() 
+{
+    if(cpcs == 0) {
+        pthread_mutex_lock(&lock.mutex);
+        cpcs = curl_share_init();
+        curl_share_setopt(cpcs, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
+        curl_share_setopt(cpcs, CURLSHOPT_LOCKFUNC, curlLock);
+        curl_share_setopt(cpcs, CURLSHOPT_UNLOCKFUNC, curlUnlock);
+        curl_share_setopt(cpcs, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+        pthread_mutex_unlock(&lock.mutex);
+    }
+}
+#endif
+
 void setPkgOptions(Options opts)
 {
     if(defaultOpts.skipCache == 1 && opts.skipCache == 0)
