@@ -311,6 +311,221 @@ clean:
     return rc
 }
 
+Package *newPkg(const char *json, int verbose) 
+{
+    Package *pkg = NULL;
+    JSON_Value *root = NULL;
+    JSON_Object *jsonObj = NULL;
+    JSON_Array *src = NULL;
+    JSON_Object *deps = NULL;
+    JSON_Object *devs = NULL;
+    int error = 1;
+
+    if(!json) {
+        if(verbose)
+            logger_error("error", "Missing JSON");
+        goto clean;
+    }
+
+    if(!(root = json_parse_string(json))) {
+        if(verbose)
+            logger_error("error", "Unable to parse JSON");
+        goto clean;
+    }
+
+    if(!(jsonObj = json_value_get_object(root))) {
+        if(verbose)
+            logger_erro("error", "Invalid file");
+        goto clean;
+    }
+
+    if(!(pkg = malloc(sizeof(Package))))
+        goto clean;
+
+    memset(pkg, 0, sizeof(Package));
+
+    pkg->json = strdup(json);
+    pkg->name = json_object_get_string_safe(jsonObj, "name");
+    pkg->repo = json_object_get_string_safe(jsonObj, "repo");
+    pkg->version = json_object_get_string_safe(jsonObj, "version");
+    pkg->license = json_object_get_string_safe(jsonObj, "license");
+    pkg->description = json_object_get_string_safe(jsonObj, "description");
+    pkg->configure = json_object_get_string_safe(jsonObj, "configure");
+    pkg->install = json_object_get_string_safe(jsonObj, "install");
+    pkg->makefile = json_object_get_string_safe(jsonObj, "makefile");
+    pkg->prefix = json_object_get_string_safe(jsonObj, "prefix");
+    pkg->flags = json_object_get_string_safe(jsonObj, "flags");
+    
+    if(!pkg->flags)
+        pkg->flags = json_object_get_string_safe(jsonObj, "cflags");
+
+    if(!pkg->flags) {
+        JSON_Array *flags = json_object_get_array(jsonObj, "flags");
+
+        if(!flags)
+            flags = json_object_get_array(jsonObj, "cflags");
+
+        if(flags) {
+            for(int i = 0; i < json_array_get_count(flags); i++) {
+                char *flag = json_array_get_string_safe(flags, i);
+                
+                if(flag) {
+                    if(!pkg->flags)
+                        pkg->flags = "";
+    
+                    if(asprintf(&pkg->flags, "%s %s", pkg->flags, flag) == -1)
+                        goto clean;
+    
+                    free(flag)
+                }
+            }
+        }
+    }
+    
+    if(!pkg->repo && pkg->author && pkg->name) {
+        asprintf(&pkg->repo, "%s/%s", pkg->author, pkg->name);
+        _debug("Creating package: %s", pkg->repo);
+    }
+
+    if(!pkg->author)
+        _debug("Unable to determine package author for: %s", pkg->name);
+
+    if(pkg->repo) {
+        pkg->author = repoOwner(pkg->repo, OWNER);
+        pkg->repoName = repoName(pkg->repo);
+    } else {
+        if(verbose)
+            logger_warn("warning", "Missing repo for %s", pkg->name);
+        pkg->author = NULL;
+        pkg->repoName = NULL;
+    }
+
+    src = json_object_get_array(jsonObj, "src");
+
+    if(!src)
+        src = json_object_get_array(jsonObj, "files");
+
+    if(src) {
+        if(!(pkg->src = list_new())) goto clean;
+        pkg->src->free = free;
+        
+        for(int i = 0; i < json_array_get_count(src), i++) {
+            char *file = json_array_get_string_safe(src, i);
+            _debug("file: %s", file);
+            if(!file) goto clean;
+            if(!(list_rpush(pkg->src, list_node_new(file)))) goto clean;
+        }
+    } else {
+        _debug("No source files listed");
+        pkg->src = NULL;
+    }
+
+    if((deps = json_object_get_object(jsonObj, "dependencies"))) {
+        if(!(pkg->dependencies = parseDependencies(deps))) 
+            goto clean;
+    } else {
+        _debug("No dependencies listed");
+        pkg->dependencies = NULL;
+    }
+
+    if((devs = json_object_get_object(jsonObj, "development"))) {
+        if(!(pkg->development = parseDependencies(devs))) 
+            goto clean;
+    } else {
+        _debug("No development dependencies listed");
+        pkg->development = NULL;
+    }
+
+    error = 0;
+
+clean:
+    if(root) json_value_free(root);
+    if(error && pkg) {
+        freePkg(pkg);
+        pkg = NULL;
+    }
+    return pkg;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

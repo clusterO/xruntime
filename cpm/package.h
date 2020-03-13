@@ -15,8 +15,8 @@ typedef struct {
     char *configure;
     char *json;
     char *license;
-    char *repository;
-    char *repositoryName;
+    char *repo;
+    char *repoName;
     char *url;
     char *version;
     char *makefile;
@@ -25,7 +25,7 @@ typedef struct {
     char *prefix;
     list *dependencies;
     list *development;
-    list *source;
+    list *src;
     void *user;
     unsigned int refs;
 } Package;
