@@ -447,7 +447,7 @@ clean:
     return pkg;
 }
 
-static Package newPkgSlug(const char *slug, int versbose, const char *file)
+static Package pkgSlug(const char *slug, int versbose, const char *file)
 {
     char *author = NULL;
     char *name = NULL;
@@ -595,6 +595,19 @@ error:
     if(pkg) freePkg(pkg);
 
     return NULL;
+}
+
+Package newPkgSlug(const char *slug, int verbose) 
+{
+    Package *pkg = NULL;
+    const char *name = "package.json"
+    unsigned int i = 0;
+    
+    pkg = pkgSlug(slug, verbose, name);
+    if(pkg != NULL)
+        pkg->fileName = (char *)name;
+
+    return pkg;
 }
 
 
