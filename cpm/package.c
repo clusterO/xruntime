@@ -610,6 +610,28 @@ Package newPkgSlug(const char *slug, int verbose)
     return pkg;
 }
 
+char *pkgUrl(const char *author, const char *name, const char *version)
+{
+    if(!author || !name || !version) return NULL;
+
+    int size = strlen(GITHUB_RAW_CONTENT_URL) + strlen(author) + strlen(name) + strlen(version) + 3;
+
+    if(defaultOpts.token != 0) 
+        size += (strlen(defaultOpts.token) + 1);
+
+    char *slug = malloc(size);
+    if(slug) {
+        memset(slug, '\0', size);
+        if(defaultOpts.token != 0)
+            sprintf(slug, GITHUB_RAW_CONTENT_AUTH_URL "%s/%s:%s", defaultOpts.token, author, name, version);
+        else
+            sprintf(slug, GITHUB_RAW_CONTENT_URL "%s/%s:%s", author, name, version);
+    }
+
+    return slug;
+}
+
+
 
 
 
