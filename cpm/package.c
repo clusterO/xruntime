@@ -651,6 +651,63 @@ char *pkgRepoUrl(const char *repo, const char *version)
     return slug;
 }
 
+char *pkgAuthor(const char *slug) 
+{
+    return repoOwner(slug, OWNER);
+}
+
+char *pkgVersion(const char *slug)
+{
+    return repoVersion(slug, VERSION);
+}
+
+char *pkgName(const char *slug) 
+{
+    return repoName(slug);
+}
+
+Dependency *newDeps(const char *repo, const char *version) 
+{
+    if(!repo || !version) return NULL;
+
+    Dependency *dep = malloc(sizeof(Dependency));
+    if(!dep) return NULL;
+
+    dep->version = strcmp("*", version) == 0 ? strdup(VERSION) : strdup(version);
+    dep->name = pkgName(repo);
+    dep->author = pkgAuthor(repo);
+
+    _debug("dependency: %s/%s:%s", dep->author, dep->name, dep->version);
+    return dep;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
