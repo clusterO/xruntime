@@ -824,7 +824,146 @@ static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void
 #endif
 }
 
+int installExe(Package *pkg, char *dir, int verbose)
+{
+    long pathMax;
+#ifdef PATH_MAX
+    pathMax = PATH_MAX;
+#elif define(_PC_PATH_MAX)
+    pathMax = pathconf(dir, _PC_PATH_MAX);
+#else
+    pathMax = 4096;
+#endif
 
+    int rc;
+    char *url = NULL;
+    char *file = NULL;
+    char *tarball = NULL;
+    char *command = NULL;
+    char *unpackDir = NULL;
+    char *deps = NULL;
+    char *tmp = NULL;
+    char *repoName = NULL;
+    char dirPath[pathMax];
+
+    _debug("Install executable %s", pkg->repo);
+
+    tmp = gettempdir();
+
+    if(tmp == NULL) {
+        if(verbose)
+            logger_error("error", "gettempdir() out of memory");
+        return -1;
+    }
+
+    if(!pkg->repo) {
+        if(verbose) 
+            logger_error("error", "Repo field missing");
+        return -1;
+    }
+
+    repoName = strrchr(pkg->repo, '/');
+    if(repoName && *repoName != '\0')
+        repoName++;
+    else {
+        if(verbose) 
+            logger_error("error", "Repo name should formatted as user/pkg");
+        return -1;
+    }
+
+    E_FORMAT(&url, "https://github.com/%s/archive/%s.tar.gz", pkg->repo, pkg->version);
+    E_FORMAT($file, "%s-%s.tar.gz", repoName, pkg->version);
+    E_FORMAT(&tarball, "%s/%s", tmp, file);
+
+    rc = http_get_file_shared(url, tarball, cpcs);
+
+    if(rc != 0) {
+        if(verbose) 
+            logger_error("error", "Failed to download '%s@%s' - HTTP GET '%s'", pkg->repo, pkg->version, url);
+        goto clean;
+    }
+
+    E_FORMAT(&command, "cd %s && gzip - dc %s | tar x", tmp, file);
+
+    _debug("download url: %s", url);
+    _debug("file: %s", file);
+    _debug("tarball: %s", tarball);
+    _debug("command(extract): %s", command);
+
+    rc = system(command);
+    if(rc != 0) goto clean;
+    free(command);
+    command = NULL;
+
+    if(defaultOpts.prefix != NULL || pkg->prefix != NULL) {
+        char path[pathMax];
+        memset(path, 0, pathMax);
+
+        if(defaultOpts.prefix) 
+            realpath(defaultOpts.prefix, path);
+        else
+            realpath(pkg->prefix, path);
+
+        _debug("env PREFIX: %s", path);
+        setenv("PREFIX", path, 1);
+        mkdirp(path, 0777);
+    }
+
+    const char *configure = pkg->configure;
+    if(configure == 0) configure = ":";
+
+    memset(dirPath, 0, pathMax);
+    realpath(dir, dirPath);
+
+    char *version = pkg->version;
+    if(version[0] == 'v') version++;
+
+    E_FORMAT(&unpackDir, "%s/%s-%s", tmp, repoName, version);
+    _debug("dir: %s", unpackDir);
+
+    if(pkg->dependencies) {
+        E_FORMAT(&deps, "%s/deps", unpackDir);
+        _debug("deps: %s", deps);
+        rc = installDeps(pkg, deps, verbose); 
+        if(rc == -1) goto clean;
+    }
+
+    if(!defaultOpts.global && pkg->makefile) {
+        E_FORMAT(&command, "cp -fr %s/%s/%s %s", dirPath, pkg->name, basename(pkg->makefile), unpackDir);
+
+        rc = system(command);
+        if(rc != 0) goto clean;
+        free(command);
+    }
+
+    if(pkg->flags) {
+        char *flags = NULL;
+#ifdef _GNU_SOURCE
+        char *cflags = secure_getenv("CFLAGS");
+#else
+        char *cflags = getenv("CFLAGS");
+#endif
+
+        if(cflags) 
+            asprintf(&flags, "%s %s", cflags, pkg->flags);
+        else
+            asprintf(&flags, "%s", pkg->flags);
+
+        setenv("CFLAGS", cflags, 1);
+    }
+
+    E_FORMAT(&command, "cd %s && %s", unpackDir, pkg->install);
+    _debug("command(install): %s", command);
+    rc = system(command);
+
+clean:
+    free(tmp);
+    free(command);
+    free(tarball);
+    free(file);
+    free(url);
+    return rc;
+}
 
 
 
