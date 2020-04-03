@@ -1344,7 +1344,20 @@ void freeDeps(Dependency *dep)
     free(dep);
 }
 
+void cleanPkgs() 
+{
+    if(visitedPackages != 0) {
+        hash_each(visitedPackages, {
+                free(key);
+                val;
+                });
 
+        hash_free(visitedPackages);
+        visitedPackages = 0;
+    }
+
+    curl_share_cleanup(cpcs);
+}
 
 
 
