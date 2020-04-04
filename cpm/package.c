@@ -34,7 +34,7 @@
 static hash_t *visitedPackages = 0;
 
 #ifdef PTHREADS_HEADER
-typedef struct Thread threadData;
+typedef struct Thread ThreadData;
 struct Thread {
     Package *pkg;
     const char *path;
@@ -394,12 +394,12 @@ Package *newPkg(const char *json, int verbose)
 
     if(pkg->repo) {
         pkg->author = repoOwner(pkg->repo, OWNER);
-        pkg->repoName = repoName(pkg->repo);
+        pkg->reponame = reponame(pkg->repo);
     } else {
         if(verbose)
             logger_warn("warning", "Missing repo for %s", pkg->name);
         pkg->author = NULL;
-        pkg->repoName = NULL;
+        pkg->reponame = NULL;
     }
 
     src = json_object_get_array(jsonObj, "src");
@@ -466,7 +466,7 @@ static Package pkgSlug(const char *slug, int versbose, const char *file)
     if(!slug) goto error;
     _debug("Creating package %s", slug);
     if(!(author = repoOwner(slug, OWNER))) goto error;
-    if(!(name = repoName(slug))) goto error;
+    if(!(name = reponame(slug))) goto error;
     if(!(version = repoVersion(slug, VERSION))) goto error;
     if(!(url = pkgUrl(author, name, version))) goto error;
     if(!(jsonUrl = buildFileUrl(url, file))) goto error;
@@ -665,7 +665,7 @@ char *pkgVersion(const char *slug)
 
 char *pkgName(const char *slug) 
 {
-    return repoName(slug);
+    return reponame(slug);
 }
 
 Dependency *newDeps(const char *repo, const char *version) 
@@ -765,7 +765,7 @@ clean:
 #ifdef PTHREADS_HEADER
 static void *fetchThreadFile(void *arg) 
 {
-    threadData *data = arg;
+    ThreadData *data = arg;
     int *status = malloc(sizeof(int));
     int rc = fetchFile(data->pkg, data->dir, data->file, data->verbose);
     *status = rc;
@@ -780,7 +780,7 @@ static int fetchPkg(Package *pkg, const char *dir, char *file, int verbose, void
 #ifdef PTHREADS_HEADER
     return fetchFile(pkg, dir, file, verbose);
 #else
-    threadData *fetch = malloc(sizeof(*fetch));
+    ThreadData *fetch = malloc(sizeof(*fetch));
     int rc = 0;
     
     if(fetch == 0) return -1;
@@ -843,7 +843,7 @@ int installExe(Package *pkg, char *dir, int verbose)
     char *unpackDir = NULL;
     char *deps = NULL;
     char *tmp = NULL;
-    char *repoName = NULL;
+    char *reponame = NULL;
     char dirPath[pathMax];
 
     _debug("Install executable %s", pkg->repo);
@@ -862,9 +862,9 @@ int installExe(Package *pkg, char *dir, int verbose)
         return -1;
     }
 
-    repoName = strrchr(pkg->repo, '/');
-    if(repoName && *repoName != '\0')
-        repoName++;
+    reponame = strrchr(pkg->repo, '/');
+    if(reponame && *reponame != '\0')
+        reponame++;
     else {
         if(verbose) 
             logger_error("error", "Repo name should formatted as user/pkg");
@@ -872,7 +872,7 @@ int installExe(Package *pkg, char *dir, int verbose)
     }
 
     E_FORMAT(&url, "https://github.com/%s/archive/%s.tar.gz", pkg->repo, pkg->version);
-    E_FORMAT($file, "%s-%s.tar.gz", repoName, pkg->version);
+    E_FORMAT($file, "%s-%s.tar.gz", reponame, pkg->version);
     E_FORMAT(&tarball, "%s/%s", tmp, file);
 
     rc = http_get_file_shared(url, tarball, cpcs);
@@ -918,7 +918,7 @@ int installExe(Package *pkg, char *dir, int verbose)
     char *version = pkg->version;
     if(version[0] == 'v') version++;
 
-    E_FORMAT(&unpackDir, "%s/%s-%s", tmp, repoName, version);
+    E_FORMAT(&unpackDir, "%s/%s-%s", tmp, reponame, version);
     _debug("dir: %s", unpackDir);
 
     if(pkg->dependencies) {
@@ -1046,13 +1046,13 @@ int installPkg(Package *pkg, const char *dir, int verbose)
     }
 
 #ifdef PTHREADS_HEADER
-    threadData **fetchs = 0;
+    ThreadData **fetchs = 0;
     if(pkg != NULL && pkg->src != NULL) 
         if(pkg->src->len > 0)
-            fetchs = malloc(pkg->src->len * sizeof(threadData));
+            fetchs = malloc(pkg->src->len * sizeof(ThreadData));
 
     if(fetchs) 
-        memset(fetchs, 0, pkg->src->len * sizeof(threadData));
+        memset(fetchs, 0, pkg->src->len * sizeof(ThreadData));
 #endif
 
     if(!pkg || !dir) {
@@ -1074,7 +1074,7 @@ int installPkg(Package *pkg, const char *dir, int verbose)
     }
 
     if(pkg->url == NULL) {
-        pkg->url = pkgUrl(pkg->author, pkg->repoName, pkg->version);
+        pkg->url = pkgUrl(pkg->author, pkg->reponame, pkg->version);
         if(pkg->url == NULL) {
             rc = -1;
             goto clean;
@@ -1115,7 +1115,7 @@ int installPkg(Package *pkg, const char *dir, int verbose)
 
 #ifdef PTHREADS_HEADER
         if(fetch != 0) {
-            threadData *data = fetch;
+            ThreadData *data = fetch;
             int *status;
             pthread_join(data->thread, (void **)&status);
             if(status != NULL) {
@@ -1184,7 +1184,7 @@ download:
         if(i < max) i++;
         else {
             while(--i >= 0) {
-                threadData *data = fetch[i];
+                ThreadData *data = fetch[i];
                 int *status;
                 pthread_join(data->thread, (void **)&status);
                 free(data);
@@ -1214,7 +1214,7 @@ download:
 
 #ifdef PTHREADS_HEADER
     while(--i >= 0) {
-        threadData *data = fetch[i];
+        ThreadData *data = fetch[i];
         int *status;
         pthread_join(data->thread, (void **)&status);
         pending--;
@@ -1313,7 +1313,7 @@ void freePkg(Package *pkg)
     FREE(makefile);
     FREE(configure);
     FREE(repo);
-    FREE(repoName);
+    FREE(reponame);
     FREE(url);
     FREE(version);
     FREE(flags);

@@ -16,7 +16,7 @@ typedef struct {
     char *json;
     char *license;
     char *repo;
-    char *repoName;
+    char *reponame;
     char *url;
     char *version;
     char *makefile;
