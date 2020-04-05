@@ -33,4 +33,14 @@ static void setManifestOpts(command_t *cmd)
     debug(&debugger, "set manifest: %s", opts.manifest);
 }
 
+static char *basePath() 
+{
+    char cwd[4096] = {0};
+    getcwd(cwd, 4096);
+    char *walk = cwd + strlen(cwd);
+    while(*(--walk) != '/');
+    char *basepath = malloc((size_t)(walk - cwd));
+    return basepath;
+}
+
 
