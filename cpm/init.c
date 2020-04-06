@@ -43,4 +43,12 @@ static char *basePath()
     return basepath;
 }
 
+static void getInput(char *buffer, size_t s)
+{
+    char *walk = buffer;
+    int c = 0;
+    while((walk - s) != buffer && (c = fgetc(stdin)) && c != 0) 
+        *(walk++) = c;
+}
+
 
