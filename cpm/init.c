@@ -97,4 +97,44 @@ clean:
     return rc;
 }
 
+int main(int argc, char **argv) 
+{
+    int exit = 0;
+    opts.verbose = 1;
+    opts.manifest = "manifest.json";
 
+    debug(&debugger, "init");
+    command_t program;
+    command_init(&program, "init");
+    program.usage = "[options]";
+    program_options(&program, "-q", "--quiet", "disable verbose", setOpts);
+    command_options(&program, "-M", "--manifest <filename>", "name your manifest file. (default manifest.json)", setManifestOpts);
+    command_parse(&program, argc, argv);
+
+    debug(&debugger, "%d arguments", program.argc);
+
+    JSON_Value *json = json_value_init_object();
+    JSON_Object *root = json_object(json);
+
+    char *basepath = basePath();
+    char *pkgName = NULL;
+
+    int rc = asprintf(&pkgName, "package name (%s): ", basepath);
+    if(rc == -1) {
+        logger_error("error", "asprintf() out of memory");
+        goto finish;
+    }
+
+    readInput(root, "name", basepath, pkgName);
+    readInput(root, "version", "0.1.0", "version (default: 0.1.0): ");
+
+    exit = writePackages(opts.manifest, json);
+
+finish:
+    free(pkgName);
+    free(basepath);
+    json_value_free(json);
+    command_free(&program);
+
+    return exit;
+}
