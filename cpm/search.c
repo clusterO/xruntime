@@ -9,6 +9,7 @@
 #include "libs/asprintf.h"
 #include "package.h"
 #include "cache.h"
+#include "http-get.h"
 
 #define NPM_URL "https://npmjs.com"
 #define SEARCH_CACHE_TIME 86400
@@ -78,5 +79,60 @@ clean:
     free(description);
     return rc;
 }
+
+static char *cacheSearch() 
+{
+    if(ccSearchExists() && cache) {
+        char *data = ccGetsearach();
+        if(data) return data;
+        goto setCache;
+    }
+
+setCache:
+    debug(&debugger, "Setting cache from %s", NPM_URL);
+    http_get_response_t *res = http_get(NPM_URL);
+    if(!res->ok) return NULL;
+
+    char *html = strdup(res->data);
+    if(html == NULL) return NULL;
+    http_get_free(res);
+
+    ccSetSeach(html);
+    debug(&debugger, "Save cache");
+    return html;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
