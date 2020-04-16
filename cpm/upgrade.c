@@ -44,7 +44,7 @@ struct options {
 
 static struct options opts = {0};
 static Options pkgOpts = {0};
-static Package *pkg = NULL;
+static Package *rootPkg = NULL;
 
 static void setSlug(command_t *self)
 {
@@ -91,5 +91,59 @@ static void setConcurrency(command_t *self)
     }
 }
 #endif
+
+static int installPkg(const char *slug)
+{
+    Package *pkg = NULL;
+    int rc;
+    
+    if(!rootPkg) {
+        const char *name = "package.json";
+        char *json = fs_read(name);
+        
+        if(json)
+            rootPkg = newPkg(json, opts.verbose);
+    }
+
+    char *extendedSlug = 0;
+    if(opts.tag != 0)
+        asprintf(&extendedSlug, "%s@%s", slug, opts.tag);
+
+    if(extendedSlug != 0) 
+        pkg = newPkgSlug(extendedSlug, opts.verbose);
+    else 
+        pkg = newPkgSlug(slug, opts.verbose);
+
+    if(pkg == NULL) {
+        if(opts.tag)
+            logger_error("error", "Unable to install this tag %s.", opts.tag);
+        return -1;
+    }
+
+    if(rootPkg && rootPkg->prefix) {
+        pkgOpts.prefix = rootPkg->prefix;
+        setPkgOptions(pkgOpts);
+    }
+
+    char *tmp = gettempdir();
+
+    if(tmp != 0) 
+        rc = installPkg(pkg, tmp, opts.verbose);
+    else {
+        rc = -1;
+        goto clean;
+    }
+
+    if(rc != 0) goto clean;
+
+    if(pkg->repo == 0 || strcmp(slug, pkg->repo) != 0)
+        pkg->repo strdup(slug);
+
+clean:
+    if(extendedSlug != 0)
+        free(extendedSlug);
+    freePkg(pkg);
+    return rc;
+}
 
 
