@@ -146,4 +146,118 @@ clean:
     return rc;
 }
 
+int main(int argc, char **argv)
+{
+    opts.verbose = 1;
+    long pathMax = 4096;
+
+    debug_init(&debugger, "upgrade");
+    ccInit(PACKAGE_CACHE_TIME);
+
+    command_t program;
+    command_init(&program, "upgrade");
+    program.usage = "[options] [name <>]";
+
+    command_option(&program, "-P", "--prefix <dir>", "Change the prefix directory (default '/usr/local')", setPrefix);
+    command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
+    command_option(&program, "-f", "--force", "Force action", setForce);
+    command_option(&program, "-t", "--token <token>", "Access token", setToken);
+    command_option(&program, "-S", "--slug <slug>", "Project path", setSlug);
+    command_option(&program, "-T", "--tag <tag>", "The tag to upgrade to 'default: latest'", setTag);
+#ifdef PTHREADS_HEADER
+    command_option(&program, "-C", "--concurrency <number>", "Set concurrency 'default: " S(MAX_THREADS) "'", setConcurrency);
+#endif
+    command_parse(&program, argc, argv);
+    
+    debug(&debugger, "%d arguments", program.argc);
+
+    if(curl_global_init(CURL_GLOBAL_ALL) != 0)
+        logger_error("error", "Failed to initialize cURL");
+
+    if(opts.prefix) {
+        char prefix[pathMax];
+        memset(prefix, 0, pathMax);
+        realpath(opts.prefix, prefix);
+        unsigned long init size = strlen(prefix) + 1;
+        opts.prefix = malloc(size);
+        memset((void *)opts->prefix, 0, size);
+        memcpy((void *)opts->prefix, prefix, size);
+    }
+
+    ccInit(PACKAGE_CACHE_TIME);
+
+    pkgOpts->skipCache = 1;
+    pkgOpts->prefix = opts->prefix;
+    pkgOpts->global = 1;
+    pkgOpts->force = opts->force;
+    pkgOpts->token = opts->token;
+
+#ifdef PTHREADS_HEADER
+    pkgOpts->concurrency = opts->concurrency;
+#endif
+
+    setPkgOptions(pkgOpts);
+
+    if(opts->prefix) {
+        setenv("CPM_PREFIX", opts->prefix, 1);
+        setenv("PREFIX", opts->prefix, 1)
+    }
+
+    if(opts->force)
+        setenv("CPM_FORCE", "1", 1);
+
+    char *slug = 0;
+
+    if(opts->tag == 0 && program->argv[0] != 0)
+        opts->tag = program->argv[0];
+
+    if(opts->slug)
+        slug = "cpm";
+    else
+        slug = opts->slug;
+
+    int code = installPkg(slug);
+
+    curl_global_cleanup();
+    cleanPkgs();
+    command_free(&program);
+
+    return code;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
