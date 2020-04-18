@@ -13,8 +13,6 @@
 #include "package.h"
 
 #define PACKAGE_CACHE_TIME 2592000
-#define SX(s) #s
-#define S(s) SX(s)
 
 #ifdef PTHREADS_HEADER
 #define MAX_THREADS 16
