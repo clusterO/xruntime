@@ -80,4 +80,38 @@ static void setConcurrency(command_t *self)
 }
 #endif
 
+static int installLocalPkgs(const char *file)
+{
+    if(fs_exists(file) == -1) {
+        logger_error("error", "Missing config file");
+        return 1;
+    }
+
+    debug(&debugger, "reading local config file");
+    char *json = fs_read(file);
+    if(json == NULL) return 1;
+
+    Package *pkg = newPkg(json, opts.verbose);
+    if(pkg == NULL) goto e1;
+    if(pkg->prefix) setenv("PREFIX", pkg->prefix, 1);
+
+    int rc = installDeps(pkg, opts.dir, opts.verbose);
+    if(rc == -1) goto e2;
+
+    if(opts.dev) {
+        rc = installDev(pkg, opts.dir, opts.verbose);
+        if(rc == -1) goto e2;
+    }
+
+    free(json);
+    freePkg(pkg);
+    return 0;
+
+e2:
+    freePkg(pkg);
+e1:
+    free(json);
+    return 1;
+}
+
 
