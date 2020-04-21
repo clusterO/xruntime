@@ -137,6 +137,75 @@ static int writeDeps(Package *pkg, char *prefix)
     return rc;
 }
 
+static int installPkg(const char *slug) 
+{
+    Package *pkg = NULL;
+    int rc;
+    long pathMax;
+#ifdef PATH_MAX
+    pathMax = PATH_MAX;
+#elif defined(_PC_PATH_MAX)
+    pathMax = pathconf(slug, _PC_PATH_MAX);
+#else
+    pathMax = 4096;
+#endif
+
+    if(!rootPkg) {
+        const char *name = "manifest.json";
+        char *json = fs_read(name);
+        
+        if(json)
+            rootPkg = newPkg(json, opts.verbose);
+    }
+    
+    if(slug[0] == '.')
+        if(strlen(slug) == 1 || (slug[1] == '/' && strlen(slug))) {
+            char dir[pathMax];
+            realpath(slug, dir);
+            slug = dir;
+            return installLocalPkgs();
+        }
+
+    if(fs_exists(slug) == 0) {
+        fs_stats *stats = fs_stat(slug);
+        if(stats != NULL && (S_IFREG == (stats->st_mode & S_IFMT)
+#if defined(__unix__) || defined(__linux__) || defined(_POSIX_VERSION)
+                    || S_IFLNK == (stats->st_mode & S_IFMT)
+#endif
+                    )) {
+            free(stats);
+            return installLocalPkgs();
+        }
+
+        if(stats) free(stats);
+    }
+
+    if(!pkg)
+        pkg = newPkgSlug(slug, opts.verbose);
+
+    if(pkg == NULL) return -1;
+
+    if(rootPkg && rootPkg->prefix) {
+        pkgOpts.prefix = rootPkg->prefix;
+        setPkgOptions(pkgOpts);
+    }
+
+    rc = installPkg(pkg, opts.dir, opts.verbose);
+    if(rc != 0) goto clean;
+
+    if(rc == 0 && opts.dev) {
+        rc = installDev(pkg, opts.dir, opts.verbose);
+        if(rc != 0) goto clean;
+    }
+
+    if(pkg->repo == 0 || strcmp(slug, pkg->repo) != 0)
+        pkg->repo = strdup(slug);
+
+clean:
+    freePkg(pkg);
+    return rc;
+}
+
 
 
 
