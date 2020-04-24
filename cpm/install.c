@@ -119,6 +119,41 @@ static void setSkipCache(command_t *self)
     debug(&debugger, "set skip cache flag");
 }
 
+static int installLocalpkgs()
+{
+    const char *file = "manifest.json";
+
+    if(fs_exists(file) == -1) {
+        logger_error("error", "Missing manifest file");
+        return 1;
+    }
+
+    debug(&debugger, "reading local manifest");
+    char *json = fs_read(file);
+    if(json == NULL) return 1;
+
+    Package *pkg = newPkg(json, opts.verbose);
+    if(pkg == NULL) goto e1;
+    if(pkg->prefix) setenv("PREFIX", pkg->prefix, 1);
+    
+    int rc = installDeps(pkg, opts.dir, opts.verbose);
+    if(rc == -1) goto e2;
+
+    if(opts.dev) {
+        rc = installDev(pkg, opts.dir, opts.verbose);
+        if(rc == -1) goto e2;
+    }
+
+    free(json);
+    freePkgs(pkg);
+    return 0;
+
+e2:
+    freePkgs(pkg);
+e1:
+    free(json);
+    return 1;
+}
 
 
 
@@ -143,3 +178,4 @@ static void setSkipCache(command_t *self)
 
 
 
+,
