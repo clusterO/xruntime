@@ -264,7 +264,16 @@ clean:
     return rc;
 }
 
+static int installPackages(int n, char **pkgs)
+{
+    for(int i = 0; i < n; i++) {
+        debug(&debugger, "install %s (%d)", pkgs[i], i);
+        if(installPackage(pkgs[i]) == -1)
+            return 1;
+    }
 
+    return 0;
+}
 
 
 
