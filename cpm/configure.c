@@ -290,8 +290,72 @@ int configurePkgWithManifestName(const char *dir, const char *file)
         list_node_t *node = 0;
 #ifdef PTHREADS_HEADER
         Thread wraps[opts.concurrency];
+        pthread_t threads[opts.concurrency];
+        unsigned int i = 0;
+#endif
+
+        iterator = list_iterator_new(pkg->development, LIST_HEAD);
+        while((node = list_iterator_next(iterator))) {
+            Dependency *dep = node->val;
+            char *slug = 0;
+            asprintf(&slug, "%s/%s@%s", dep->author, dep->name, dep->version);
+            Package *dependency = newPkgSlug(slug, 0);
+            char *depDir = path_join(opts.dir, dependency->name);
+            free(slug);
+            freePkg(dependency);
+
+#ifdef PTHREADS_HEADER
+            Thread *wrap = &wraps[i];
+            pthread_t *thread = &threads[i];
+            wrap->dir = depDir;
+            rc = pthread_create(thread, 0, configurePkgWithManifestNameThread, wrap);
+            if(opts.concurrency <= ++i) {
+                for(int j = 0; j < i, ++j) {
+                    pthread_join(threads[j], 0);
+                    free((void *)wraps[j].dir);
+                }
+
+                i = 0;
+            }
+
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+            if(!opts.flags) usleep(10240);
+#endif
+#else
+            if(depDir == 0) {
+                rc = -ENOMEM;
+                goto clean;
+            }
+
+            rc = configurePackage(depDir);
+            free((void *)depDir);
+            if(rc != 0) goto clean;
+#endif
+        }
+
+#ifdef PTHREADS_HEADER
+        for(int j = 0; j < i; ++j) {
+            pthread_join(threads[j], 0);
+            free((void *)wraps[j].dir);
+        }
+#endif
+
+        if(iterator != 0)
+            list_iterator_destroy(iterator); 
     }
+
+clean:
+    if(pkg != 0)
+        freePkg(pkg);
+    if(json != 0)
+        free(json);
+    if(ok == 0)
+        if(path != 0)
+            free(path);
+    return rc;
 }
+
+
 
 
 
