@@ -70,6 +70,65 @@ options opts = {
 #endif
 };
 
+static void setCache(command_t *self) 
+{
+    opts.skipCache = 1;
+    debug(&debugger, "set skip cache flag");
+}
+
+static void setDev(command_t *self) 
+{
+    opts.dev = 1;
+    debug(&debugger, "set dev flag");
+}
+
+static void setForce(command_t *self) 
+{
+    opts.force = 1;
+    debug(&debugger, "set force flag");
+}
+
+static void setGlobal(command_t *self) 
+{
+    opts.global = 1;
+    debug(&debugger, "set global flag");
+}
+
+static void setFlags(command_t *self) 
+{
+    opts.flags = 1;
+    opts.verbose = 0;
+    debug(&debugger, "set flags flag");
+}
+
+static void setPrefix(command_t *self) 
+{
+    opts.prefix = (char *)self->arg;
+    debug(&debugger, "set prefix: %s", opts.prefix);
+}
+
+static void setDir(command_t *self) 
+{
+    opts.dir = (char *)self->arg;
+    debug(&debugger, "set dir: %s", opts.dir);
+}
+
+static void unsetVerbose(command_t *self) 
+{
+    opts.verbose = 0;
+    debug(&debugger, "set quiet flag");
+}
+
+#ifdef PTHREADS_HEADER
+static void setConcurrency(command_t *self) 
+{
+    if(self->arg) {
+        opts.concurrency = atol(self->arg);
+        debug(&debugger, "set concurrenc: %lu", opts.concurrency);
+    }
+}
+#endif
+
 #ifdef PTHREADS_HEADER
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -77,15 +136,15 @@ struct Thread {
     const char *dir;
 };
 
-void *configurePkgWithManifestNameThread(void *arg) {
+void *configurePackageThread(void *arg) {
     Thread *wrap = arg;
     const char *dir = wrap->dir;
-    configure(dir);
+    configurePackage(dir);
     return 0;
 }
 #endif
 
-int configurePkgWithManifestName(const char *dir, const char *file)
+int configurePackage(const char *dir)
 {
     Package *pkg = NULL;
     char *json = 0;
@@ -99,7 +158,7 @@ int configurePkgWithManifestName(const char *dir, const char *file)
     pathMax = 4096;
 #endif
     
-    char *path = path_join(dir, file);
+    char *path = path_join(dir, "manifest.json");
     if(path == 0) return -ENOMEM;
     
 #ifdef PTHREADS_HEADER
@@ -248,7 +307,7 @@ int configurePkgWithManifestName(const char *dir, const char *file)
             Thread *wrap = &wrap[i];
             pthread_t *thread = &threads[i];
             wrap->dir = depDir;
-            rc = pthread_create(thread, 0, configurePkgWithManifestNameThread, wrap);
+            rc = pthread_create(thread, 0, configurePackageThread, wrap);
 
             if(opts.concurrency <= ++i) {
                 for(int j = 0; j < 0; ++j) {
@@ -308,7 +367,7 @@ int configurePkgWithManifestName(const char *dir, const char *file)
             Thread *wrap = &wraps[i];
             pthread_t *thread = &threads[i];
             wrap->dir = depDir;
-            rc = pthread_create(thread, 0, configurePkgWithManifestNameThread, wrap);
+            rc = pthread_create(thread, 0, configurePackageThread, wrap);
             if(opts.concurrency <= ++i) {
                 for(int j = 0; j < i, ++j) {
                     pthread_join(threads[j], 0);
@@ -354,7 +413,6 @@ clean:
             free(path);
     return rc;
 }
-
 
 
 
