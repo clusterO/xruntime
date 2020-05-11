@@ -74,6 +74,71 @@ options opts = {
 #endif
 };
 
+static void setCache(command_t *self) {
+    opts.skipCache = 1;
+    debug(&debugger, "set skip cache flag");
+}
+
+
+static void setDev(command_t *self) {
+    opts.dev = 1;
+    debug(&debugger, "set dev flag");
+}
+
+static void setForce(command_t *self) {
+    opts.force = 1;
+    debug(&debugger, "set force flag");
+}
+
+static void setGlobal(command_t *self) {
+    opts.global = 1;
+    debug(&debugger, "set global flag");
+}
+
+static void setClean(command_t *self) {
+    if(self->arg && self->arg[0] != '-')
+        opts.clean = (char *)self->arg;
+    else
+        opts.clean = "clean";
+
+    debug(&debugger, "set clean flag");
+}
+
+static void setTest(command_t *self) {
+    if(self->arg && self->arg[0] != '-')
+        opts.test = (char *)self->arg;
+    else
+        opts.test = "test";
+
+    debug(&debugger, "set test flag");
+}
+
+static void setPrefix(command_t *self) {
+    if(self->arg && self->arg[0] != '-')
+        opts.prefix = (char *)self->arg;
+
+    debug(&debugger, "set prefix: %s", opts.prefix);
+}
+
+static void setDir(command_t *self) {
+    opts.dir = (char *)self->arg;
+    debug(&debugger, "set dir: %s", opts.dir);
+}
+
+static void unsetVerbose(command_t *self) {
+    opts.verbose = 0;
+    debug(&debugger, "set quiet flag");
+}
+
+#ifdef PTHREADS_HEADER
+static void setConcurency(command_t *self) {
+    if(self->arg) {
+        opts.concurrency = atol(self->arg);
+        debug(&debugger, "set concurrency: %lu", opts.concurrency);
+    }
+}
+#endif
+
 int buildPackage(const char *dir);
 
 #ifdef PTHREADS_HEADER
