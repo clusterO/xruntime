@@ -452,7 +452,45 @@ clean:
     return rc;
 }
 
+int main(int argc, char **argv)
+{
+    int rc = 0;
+    long pathMax;
+#ifdef PATH_MAX
+    pathMax = PATH_MAX;
+#elif defined(_PC_PATH_MAX)
+    pathMax = pathconf(opts.dir, _PC_PATH_MAX);
+#else
+    pathMax = 4096;
+#endif
+    char CWD[pathMax];
+    memset(CWD, 0, pathMax);
+    
+    if(getcwd(CWD, pathMax) == 0) return -errno;
 
+    built = hash_new();
+    hash_set(built, strdup("build"));
+    
+    command_init(&program, "build");
+    debug_init(&debugger, "build");
+
+    program.usage = "[options] [name <>]";
+
+    command_option(&program, "-o", "--out <dir>", "Change the output directoy 'default: deps'", setDir);
+    command_option(&program, "-P", "--prefix <dir>", "Change the prefix directoy 'default: /usr/local'", setPrefix);
+    command_option(&program, "-q", "--quiet", "Disable verbose", unsetVerbose);
+    command_option(&program, "-g", "--global", "Build global", setGlobal);
+    command_option(&program, "-Cl", "--clean [target]", "Clean target before building 'default: clean'", setClean);
+    command_option(&program, "-T", "--test [target]", "Test target 'default: test'", setTest);
+    command_option(&program, "-d", "--dev", "Build development dependencies", setDev);
+    command_option(&program, "-f", "--force", "Force the action", setForce);
+    command_option(&program, "-c", "--skip-cache", "Skip caching", setCache);
+#ifdef PTHREADS_HEADER
+    command_option(&program, "-C", "--concurrency <number>", "Set concurrency", setConcurency);
+#endif
+
+    command_parse(&program, argc, argv);
+}
 
 
 
