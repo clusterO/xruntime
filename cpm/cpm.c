@@ -1,0 +1,37 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include "cache.h"
+#include "libs/asprintf.h"
+#include "libs/debug.h"
+#include "libs/fs.h"
+#include "libs/http-get.h"
+#include "libs/logger.h"
+#include "libs/parson.h"
+#include "libs/path-join.h"
+#include "libs/str-flatten.h"
+#include "libs/strdup.h"
+#include "libs/trim.h"
+#include "libs/which.h"
+
+#if defined(_WIN32) || defined(WIN32) || defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
+#define setenv(n, v, o) _putenv_s(n, v)
+#define realpath(p, rp) _fullpath(p, rp, strlen(p))
+#endif
+
+#define NOTIF_EXPIRATION 259200
+
+debug_t debugger;
+static const char *usage = "";
+
+#define format(...)
+({
+ if(asprintf(__VA_ARGS__) == -1) {
+    rc = 1;
+    fprintf(stderr, "Memory allocation failure\n");
+    goto clean;
+ }
+})
+
+
