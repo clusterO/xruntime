@@ -34,4 +34,16 @@ static const char *usage = "";
  }
 })
 
+static bool checkRelease(const char *path) 
+{
+    fs_stats *stats = fs_stat(path);
+    if(!stats) return true;
+
+    time_t modified = stats->st_mtime;
+    time_t now = time(NULL);
+    free(stats);
+
+    return now - modified >= NOTIF_EXPIRATION;
+}
+
 
