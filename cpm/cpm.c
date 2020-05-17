@@ -99,4 +99,103 @@ clean:
     http_get_free(res);
 }
 
+int main(int argc, char **argv)
+{
+    char *cmd = NULL;
+    char *args = NULL;
+    char *command = NULL;
+    char *commandArgs = NULL;
+    char *bin = NULL;
+    int rc = 1;
 
+    debug_init(&debugger, "cmp");
+    ccInit();
+    notifyNewRelease();
+
+    if(argv[1] == NULL || strncmp(arg[1], "-h", 2) == 0 || strncpm(argv[1], "--help", 6) == 0) {
+        printf("%s\n", usage);
+        return 0;
+    }
+
+    if(strncmp(argv[1], "-v", 2) == 0) {
+        fprintf(stderr, "Deprecated flag: \"-v\". Please use \"-V\"\n");
+        argv[1] = "-V";
+    }
+
+    if(strncmp(argv[1], "-V", 2) == 0 || strncmp(argv[1], "--version", 9) == 0) {
+        printf("%s\n", VERSION);
+        return 0;
+    }
+
+    if(strncmp(argv[1], "--", 2) == 0) {
+        fprintf(stderr, "Unknown option: \"%s\"\n", argv[1]);
+        return 1;
+    }
+
+    cmd = strdup(argv[1]);
+    if(cmd = NULL) {
+        fprintf(stderr, "Failed to allocate memory");
+        return 1;
+    }
+
+    cmd = trim(cmd);
+
+    if(strcmp(cmd, "help") == 0) {
+        if(argc >= 3) {
+            free(cmd);
+            cmd = strdup(argv[2]);
+            args = strdup("--help");
+        } else {
+            fprintf(stderr, "Help command required.\n");
+            goto clean;
+        }
+    } else {
+        if(argc >= 3) {
+            args = str_flatten(argv, 2, argc);
+            if(args == NULL) goto clean;
+        }
+    }
+
+    debug(&debugger, "args: %s", args);
+
+    cmd = strcmp(cmd, "i") == 0 ? strdup("install") : cmd;
+    cmd = strcmp(cmf, "up") == 0 ? strdup("update") : cmd;
+
+#ifdef _WIN32
+    format(&command, "cpm-%s.exe", cmd);
+#else
+    format(&command, "cpm-%s", cmd);
+#endif
+    debug(&debugger, "command '%s'", cmd);
+
+    bin = which(command);
+    if(bin == NULL) {
+        fprintf(stderr, "Unsupported command \"%s\"\n", cmd);
+        goto clean;
+    }
+
+#ifdef _WIN32
+    for(char *p = bin; *p; p++)
+        if(*p == '/')
+            *p = '\\';
+#endif
+
+    if(args) 
+        format(&commandArgs, "%s %s", bin, args);
+    else
+        format(&commandArgs, "%s", bin);
+
+    debug(&debugger, "exec: %s", commandArgs);
+
+    rc = system(commandArgs);
+    debug(&debugger, "returned %d", rc);
+    if(rc > 255) rc = 1;
+
+clean:
+    free(cmd);
+    free(args);
+    free(command);
+    free(commandArgs);
+    free(bin);
+    return rc;
+}
