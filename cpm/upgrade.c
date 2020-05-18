@@ -4,13 +4,13 @@
 #include <limits.h>
 #include <libgen.h>
 #include <curl/curl.h>
-#include <asprintf/asprintf.h>
+#include <libs/asprintf.h>
 #include "libs/libs.h"
 #include "libs/fs.h"
 #include "libs/http-get.h"
 #include "libs/logger.h"
-#include "cache.h"
-#include "package.h"
+#include "common/cache.h"
+#include "common/package.h"
 
 #define PACKAGE_CACHE_TIME 2592000
 
@@ -178,41 +178,41 @@ int main(int argc, char **argv)
         realpath(opts.prefix, prefix);
         unsigned long init size = strlen(prefix) + 1;
         opts.prefix = malloc(size);
-        memset((void *)opts->prefix, 0, size);
-        memcpy((void *)opts->prefix, prefix, size);
+        memset((void *)opts.prefix, 0, size);
+        memcpy((void *)opts.prefix, prefix, size);
     }
 
     ccInit(PACKAGE_CACHE_TIME);
 
-    pkgOpts->skipCache = 1;
-    pkgOpts->prefix = opts->prefix;
-    pkgOpts->global = 1;
-    pkgOpts->force = opts->force;
-    pkgOpts->token = opts->token;
+    pkgOpts.skipCache = 1;
+    pkgOpts.prefix = opts.prefix;
+    pkgOpts.global = 1;
+    pkgOpts.force = opts.force;
+    pkgOpts.token = opts.token;
 
 #ifdef PTHREADS_HEADER
-    pkgOpts->concurrency = opts->concurrency;
+    pkgOpts.concurrency = opts.concurrency;
 #endif
 
     setPkgOptions(pkgOpts);
 
-    if(opts->prefix) {
-        setenv("CPM_PREFIX", opts->prefix, 1);
-        setenv("PREFIX", opts->prefix, 1)
+    if(opts.prefix) {
+        setenv("CPM_PREFIX", opts.prefix, 1);
+        setenv("PREFIX", opts.prefix, 1)
     }
 
-    if(opts->force)
+    if(opts.force)
         setenv("CPM_FORCE", "1", 1);
 
     char *slug = 0;
 
-    if(opts->tag == 0 && program->argv[0] != 0)
-        opts->tag = program->argv[0];
+    if(opts.tag == 0 && program.argv[0] != 0)
+        opts.tag = program.argv[0];
 
-    if(opts->slug)
+    if(opts.slug)
         slug = "cpm";
     else
-        slug = opts->slug;
+        slug = opts.slug;
 
     int code = installPkg(slug);
 

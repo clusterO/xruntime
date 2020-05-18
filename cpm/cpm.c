@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include "cache.h"
+#include "common/cache.h"
 #include "libs/asprintf.h"
 #include "libs/debug.h"
 #include "libs/fs.h"

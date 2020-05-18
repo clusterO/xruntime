@@ -8,8 +8,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <direct.h>
-#include "cache.h"
-#include "package.h"
+#include "common/cache.h"
+#include "common/package.h"
 #include "libs/asprintf.h"
 #include "libs/commander.h"
 #include "libs/debug.h"

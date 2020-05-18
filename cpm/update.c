@@ -9,8 +9,8 @@
 #include "libs/logger.h"
 #include "libs/commander.h"
 #include "libs/parson.h"
-#include "package.h"
-#include "cache.h"
+#include "common/package.h"
+#include "common/cache.h"
 
 #define PACKAGE_CACHE_TIME 2592000
 
