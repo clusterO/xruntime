@@ -6,7 +6,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <direct.h>
 #include "libs/asprintf.h"
 #include "libs/commander.h"
 #include "libs/debug.h"
@@ -21,6 +20,7 @@
 #include "common/package.h"
 
 #ifdef _WIN32
+#include <direct.h>
 #define getcwd _getcwd
 #endif
 
@@ -53,9 +53,9 @@ char **argV = 0;
 int argC = 0;
 int offset = 0;
 Options pkgOpts = {0};
-Package rootPkg = NULL;
+Package *rootPkg = NULL;
 debug_t debugger = {0};
-options opts = {
+struct options opts = {
     .skipCache = 0,
     .verbose = 1,
     .force = 0,

@@ -1,6 +1,9 @@
 #ifndef CPM_PACKAGE_HEADER
 #define CPM_PACKAGE_HEADER
 
+#include "../libs/list.h"
+#include <curl/curl.h>
+
 typedef struct {
     char *name;
     char *author;
@@ -23,9 +26,9 @@ typedef struct {
     char *filename;
     char *flags;
     char *prefix;
-    list *dependencies;
-    list *development;
-    list *src;
+    list_t *dependencies;
+    list_t *development;
+    list_t *src;
     void *user;
     unsigned int refs;
 } Package;
