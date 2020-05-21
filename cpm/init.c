@@ -9,7 +9,11 @@
 #include "libs/commander.h"
 #include "libs/parson.h"
 
-#if defined(_WIN32 || defined(WIN32) || defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__))
+#ifndef VERSION
+#define VERSION "0.1.0"
+#endif
+
+#if defined(_WIN32) || defined(WIN32) || defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
 #define setenv(n, v, o) _putenv(n, v)
 #define realpath(p, rp) _fullpath(p, rp, strlen(p))
 #endif
@@ -19,7 +23,7 @@ debug_t debugger;
 struct Options {
     char *manifest;
     int verbose;
-}
+};
 
 static struct Options opts;
 
@@ -53,13 +57,13 @@ static void getInput(char *buffer, size_t s)
         *(walk++) = c;
 }
 
-static void readInput(JSON_Object *root, const char *key, const char *value, const char *output) 
+static void readInput(JSON_Object *root, const char *key, const char *defaultValue, const char *output) 
 {
     static char buffer[512] = {0};
     memset(buffer, '\0', 512);
     printf("%s", output);
     getInput(buffer, 512);
-    char *value = (char *)(strlen(buffer) > 0 ? buffer : value);
+    char *value = (char *)(strlen(buffer) > 0 ? buffer : defaultValue);
     json_object_set_string(root, key, value);
 }
 
@@ -105,7 +109,7 @@ int main(int argc, char **argv)
 
     debug(&debugger, "init");
     command_t program;
-    command_init(&program, "init");
+    command_init(&program, "init", VERSION);
     program.usage = "[options]";
     program_options(&program, "-q", "--quiet", "disable verbose", setOpts);
     command_options(&program, "-M", "--manifest <filename>", "name your manifest file. (default manifest.json)", setManifestOpts);
