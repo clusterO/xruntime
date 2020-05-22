@@ -13,6 +13,10 @@
 #include "libs/logger.h"
 #include "libs/parson.h"
 
+#ifndef VERSION
+#define VERSION "0.1.0"
+#endif
+
 #define PACKAGE_CACHE_TIME 2592000
 
 #ifdef PTHREADS_HEADER
@@ -119,8 +123,9 @@ static void setSkipCache(command_t *self)
     debug(&debugger, "set skip cache flag");
 }
 
-static int installLocalpkgs(const char *file)
+static int installLocalpkgs()
 {
+	const char *file = "manifest.json";
     if(fs_exists(file) == -1) {
         logger_error("error", "Missing manifest file");
         return 1;
@@ -220,8 +225,8 @@ static int installPackage(const char *slug)
         }
 
     if(fs_exists(slug) == 0) {
-        fs_stats *stats = fs_stats(slug);
-        if(stats != NULL && (s_IFREG == (stats->st_mode & S_IFMT)
+        fs_stats *stats = fs_stat(slug);
+        if(stats != NULL && (S_IFREG == (stats->st_mode & S_IFMT)
 #if defined(__unix__) || defined(__linux__) || defined(_POSIX_VERSION)
                     || S_IFLNK == (stats->st_mode & S_IFMT)
 #endif
@@ -299,7 +304,7 @@ int main(int argc, char **argv)
     ccInit(PACKAGE_CACHE_TIME);
 
     command_t program;
-    command_init(&program, "intall");
+    command_init(&program, "intall", VERSION);
     program.usage = "[options] [name <>]";
 
     command_option(&program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
@@ -361,22 +366,3 @@ int main(int argc, char **argv)
     command_free(&program);
     return code;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-,
