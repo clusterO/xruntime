@@ -2,11 +2,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
-#include "fs.h"
-#include "mkdirp.h"
-#include "rimraf.h"
-#include "copy.h"
 #include "cache.h"
+#include "../libs/fs.h"
+#include "../libs/mkdirp.h"
+#include "../libs/rimraf.h"
+#include "../libs/copy.h"
+
 
 #ifdef _WIN32
 #define PATH getenv("AppData")
@@ -18,31 +19,31 @@
 #define PKG "%s/%s.%s.%s"
 #define JSON "%s/%s.%s.%s.json"
 
-#define GET_PKG_CACHE(author, name, version) 
-char pkgCache[BUFSIZE];
+#define GET_PKG_CACHE(author, name, version)\
+char pkgCache[BUFSIZ];\
 pkgCachePath(pkgCache, author, name, version);
 
-#define GET_JSON_CACHE(author, name, version)
-char jsonCache[BUFSIZE];
-char jsonCachePath(jsonCache, author, name, version);
+#define GET_JSON_CACHE(author, name, version)\
+char jsonCache[BUFSIZ];\
+jsonCachePath(jsonCache, author, name, version);
 
-static char pkgCachePath[BUFSIZE];
-static char seachCache[BUFSIZE];
-static char jsonCachePath[BUFSIZE];
-static char cachePath[BUFSIZE];
+static char pkgCacheDir[BUFSIZ];
+static char searchCache[BUFSIZ];
+static char jsonCacheDir[BUFSIZ];
+static char cachePath[BUFSIZ];
 static time_t cacheExpiration;
 
 static void pkgCachePath(char *pkgCache, char *author, char *name, char *version) 
 {
-    sprintf(pkgCache, PKG, pkgCachePath, author, name, version);
+    sprintf(pkgCache, PKG, pkgCacheDir, author, name, version);
 }
 
 static void jsonCachePath(char *jsonCache, char *author, char *name, char *version)
 {
-    sprintf(jsonCache, JSON, jsonCachePath, author, name, version);
+    sprintf(jsonCache, JSON, jsonCacheDir, author, name, version);
 }
 
-const char ccPath() 
+const char *ccPath() 
 {
     return pkgCachePath;
 }
@@ -72,7 +73,7 @@ int ccCreate(time_t expr)
     cacheExpiration = expr;
     sprintf(pkgCachePath, CACHE, "/packages", PATH);
     sprintf(jsonCachePath, CACHE, "/json", PATH);
-    sprintf(seachCache, CACHE "search.html", PATH);
+    sprintf(searchCache, CACHE "search.html", PATH);
 
     if(dirExist(pkgCachePath) != 0) return -1;
     if(dirExist(jsonCachePath) != 0) return -1;
@@ -119,7 +120,7 @@ int ccDeleteConfig(char *author, char *name, char *version)
 
 int ccSearchExists() 
 {
-    return fs_exists(seachCache) == 0;
+    return fs_exists(searchCache) == 0;
 }
 
 char *ccGetSearch()
@@ -128,14 +129,14 @@ char *ccGetSearch()
     return fs_read(searchCache);
 }
 
-char ccSetSearch(char *content)
+int ccSetSearch(char *content)
 {
     return fs_write(searchCache, content);
 }
 
 int ccDeleteSearch() 
 {
-    return unlink(seachCache);
+    return unlink(searchCache);
 }
 
 int ccPackageExists(char *author, char *name, char *version) 
