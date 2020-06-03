@@ -38,7 +38,7 @@ typedef struct {
     int force;
     int global;
     char *prefix;
-    int concurency;
+    int concurrency;
     char *token;
 } Options;
 
@@ -59,7 +59,7 @@ extern int installPkg(Package *, const char *, int);
 extern int installDeps(Package *, const char *, int);
 extern int installDev(Package *, const char *, int);
 extern void freePkg(Package *);
-extern void freeDeps(void *);
+extern void freeDeps(Dependency *);
 extern void cleanPkgs();
 
 #endif
