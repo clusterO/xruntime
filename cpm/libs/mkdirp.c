@@ -10,8 +10,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include "strdup/strdup.h"
-#include "path-normalize/path-normalize.h"
+#include "strdup.h"
+#include "path-normalize.h"
 #include "mkdirp.h"
 
 #ifdef _WIN32

@@ -9,8 +9,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "strdup/strdup.h"
-#include "substr/substr.h"
+#include "strdup.h"
+#include "substr.h"
 #include "parse-repo.h"
 
 char *

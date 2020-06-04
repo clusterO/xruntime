@@ -18,7 +18,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "path-join/path-join.h"
+#include "path-join.h"
 #include "rimraf.h"
 
 /*

@@ -4,9 +4,9 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include "strdup/strdup.h"
-#include "asprintf/asprintf.h"
-#include "wildcardcmp/wildcardcmp.h"
+#include "strdup.h"
+#include "asprintf.h"
+#include "wildcardcmp.h"
 #include "debug.h"
 
 /**
