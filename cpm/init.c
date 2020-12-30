@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "common/package.h"
 #include "libs/asprintf.h"
 #include "libs/logger.h"
 #include "libs/debug.h"
 #include "libs/commander.h"
 #include "libs/parson.h"
+#include "common/package.h"
 
 #ifndef VERSION
 #define VERSION "0.1.0"

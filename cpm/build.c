@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <curl/curl.h>
 #include <errno.h>
 #include <libgen.h>
 #include <limits.h>
@@ -19,6 +18,7 @@
 #include "libs/path-join.h"
 #include "libs/str-flatten.h"
 #include "libs/trim.h"
+#include <curl/curl.h>
 
 #ifndef VERSION
 #define VERSION "0.1.0"
@@ -240,7 +240,7 @@ int buildPackage(const char *dir)
     if(pkg->makefile != 0) {
         char *makefile = path_join(dir, pkg->makefile);
         char *command = 0;
-        char *args = argC > 0 ? str_flatten((const char **)argV, 0, argC) : "";
+        char *args = argC > 0 ? str_flatten((char **)argV, 0, argC) : "";
         char *clean = 0;
         char *flags = 0;
         
@@ -616,7 +616,7 @@ int main(int argc, char **argv)
     curl_global_cleanup();
     cleanPkgs();
 
-    if(opts.dir) free(opts.dir);
+    if(opts.dir) free((char*)opts.dir);
     if(opts.prefix) free(opts.prefix);
 
     if(argC > 0) {

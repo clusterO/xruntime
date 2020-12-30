@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 #include "common/cache.h"
 #include "libs/asprintf.h"
 #include "libs/debug.h"
@@ -15,6 +16,14 @@
 #include "libs/trim.h"
 #include "libs/which.h"
 
+#ifndef VERSION
+#define VERSION "0.1.0"
+#endif
+
+#ifndef LATEST_RELEASE_URL
+#define LATEST_RELEASE_URL ""
+#endif
+
 #if defined(_WIN32) || defined(WIN32) || defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
 #define setenv(n, v, o) _putenv_s(n, v)
 #define realpath(p, rp) _fullpath(p, rp, strlen(p))
@@ -25,14 +34,14 @@
 debug_t debugger;
 static const char *usage = "";
 
-#define format(...)
-({
- if(asprintf(__VA_ARGS__) == -1) {
-    rc = 1;
-    fprintf(stderr, "Memory allocation failure\n");
-    goto clean;
- }
-})
+#define format(...)\
+({\
+ if(asprintf(__VA_ARGS__) == -1) {\
+    rc = 1;\
+    fprintf(stderr, "Memory allocation failure\n");\
+    goto clean;\
+ }\
+})\
 
 static bool checkRelease(const char *path) 
 {
@@ -57,7 +66,7 @@ static void compareVersions(const JSON_Object *res, const char *marker)
 
 static void notifyNewRelease() 
 {
-    const char *marker = path_join(ccMetaDir(), "Notification checkde");
+    const char *marker = path_join(ccMetaPath(), "Notification checked");
 
     if(!marker) {
         fs_write(marker, " ");
@@ -112,7 +121,7 @@ int main(int argc, char **argv)
     ccInit();
     notifyNewRelease();
 
-    if(argv[1] == NULL || strncmp(arg[1], "-h", 2) == 0 || strncpm(argv[1], "--help", 6) == 0) {
+    if(argv[1] == NULL || strncmp(argv[1], "-h", 2) == 0 || strncmp(argv[1], "--help", 6) == 0) {
         printf("%s\n", usage);
         return 0;
     }
@@ -133,7 +142,7 @@ int main(int argc, char **argv)
     }
 
     cmd = strdup(argv[1]);
-    if(cmd = NULL) {
+    if(cmd == NULL) {
         fprintf(stderr, "Failed to allocate memory");
         return 1;
     }
@@ -159,7 +168,7 @@ int main(int argc, char **argv)
     debug(&debugger, "args: %s", args);
 
     cmd = strcmp(cmd, "i") == 0 ? strdup("install") : cmd;
-    cmd = strcmp(cmf, "up") == 0 ? strdup("update") : cmd;
+    cmd = strcmp(cmd, "up") == 0 ? strdup("update") : cmd;
 
 #ifdef _WIN32
     format(&command, "cpm-%s.exe", cmd);

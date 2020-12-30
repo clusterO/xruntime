@@ -11,6 +11,6 @@
 #define STR_FLATTEN_H 1
 
 char *
-str_flatten(const char *[], int, int);
+str_flatten(char **, int, int);
 
 #endif
