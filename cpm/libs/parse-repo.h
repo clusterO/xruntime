@@ -18,7 +18,7 @@
  */
 
 char *
-parse_repo_owner(const char *, const char *);
+GetRepoOwner(const char *, const char *);
 
 /**
  * Parse the repo name from the given slug.
@@ -27,7 +27,7 @@ parse_repo_owner(const char *, const char *);
  */
 
 char *
-parse_repo_name(const char *);
+GetRepoName(const char *);
 
 /**
  * Parse the repo version from the given slug.  If
@@ -38,6 +38,6 @@ parse_repo_name(const char *);
  */
 
 char *
-parse_repo_version(const char *, const char *);
+GetRepoVersion(const char *, const char *);
 
 #endif

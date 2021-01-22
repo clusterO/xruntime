@@ -1,9 +1,11 @@
+#include "common/cache.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
-#include "common/cache.h"
+
 #include "libs/asprintf.h"
 #include "libs/debug.h"
 #include "libs/fs.h"
@@ -34,19 +36,21 @@
 debug_t debugger;
 static const char *usage = "";
 
-#define format(...)\
-({\
- if(asprintf(__VA_ARGS__) == -1) {\
-    rc = 1;\
-    fprintf(stderr, "Memory allocation failure\n");\
-    goto clean;\
- }\
-})\
+#define format(...)                                         \
+    ({                                                      \
+        if (asprintf(__VA_ARGS__) == -1)                    \
+        {                                                   \
+            rc = 1;                                         \
+            fprintf(stderr, "Memory allocation failure\n"); \
+            goto clean;                                     \
+        }                                                   \
+    })
 
-static bool checkRelease(const char *path) 
+static bool checkRelease(const char *path)
 {
     fs_stats *stats = fs_stat(path);
-    if(!stats) return true;
+    if (!stats)
+        return true;
 
     time_t modified = stats->st_mtime;
     time_t now = time(NULL);
@@ -58,22 +62,23 @@ static bool checkRelease(const char *path)
 static void compareVersions(const JSON_Object *res, const char *marker)
 {
     const char *latestVersion = json_object_get_string(res, "tag");
-    
-    if(strcmp(VERSION, latestVersion) != 0) 
+
+    if (strcmp(VERSION, latestVersion) != 0)
         logger_info("info", "New version is available. use upgrade --tag %s", latestVersion);
 }
 
-
-static void notifyNewRelease() 
+static void notifyNewRelease()
 {
     const char *marker = path_join(ccMetaPath(), "Notification checked");
 
-    if(!marker) {
+    if (!marker)
+    {
         fs_write(marker, " ");
         return;
     }
 
-    if(!checkRelease(marker)) {
+    if (!checkRelease(marker))
+    {
         debug(&debugger, "All OK");
         return;
     }
@@ -83,17 +88,20 @@ static void notifyNewRelease()
 
     http_get_response_t *res = http_get(LATEST_RELEASE_URL);
 
-    if(!res->ok) {
+    if (!res->ok)
+    {
         debug(&debugger, "Failed to check for release");
         goto clean;
     }
 
-    if(!(json = json_parse_string(res->data))) {
+    if (!(json = json_parse_string(res->data)))
+    {
         debug(&debugger, "Unable to parse json response");
         goto clean;
     }
 
-    if(!(jsonObj = json_value_get_object(json))) {
+    if (!(jsonObj = json_value_get_object(json)))
+    {
         debug(&debugger, "Unable to parse json object");
         goto clean;
     }
@@ -102,7 +110,7 @@ static void notifyNewRelease()
     fs_write(marker, " ");
 
 clean:
-    if(json)
+    if (json)
         json_value_free(json);
     free((void *)marker);
     http_get_free(res);
@@ -121,47 +129,60 @@ int main(int argc, char **argv)
     ccInit();
     notifyNewRelease();
 
-    if(argv[1] == NULL || strncmp(argv[1], "-h", 2) == 0 || strncmp(argv[1], "--help", 6) == 0) {
+    if (argv[1] == NULL || strncmp(argv[1], "-h", 2) == 0 || strncmp(argv[1], "--help", 6) == 0)
+    {
         printf("%s\n", usage);
         return 0;
     }
 
-    if(strncmp(argv[1], "-v", 2) == 0) {
+    if (strncmp(argv[1], "-v", 2) == 0)
+    {
         fprintf(stderr, "Deprecated flag: \"-v\". Please use \"-V\"\n");
         argv[1] = "-V";
     }
 
-    if(strncmp(argv[1], "-V", 2) == 0 || strncmp(argv[1], "--version", 9) == 0) {
+    if (strncmp(argv[1], "-V", 2) == 0 || strncmp(argv[1], "--version", 9) == 0)
+    {
         printf("%s\n", VERSION);
         return 0;
     }
 
-    if(strncmp(argv[1], "--", 2) == 0) {
+    if (strncmp(argv[1], "--", 2) == 0)
+    {
         fprintf(stderr, "Unknown option: \"%s\"\n", argv[1]);
         return 1;
     }
 
     cmd = strdup(argv[1]);
-    if(cmd == NULL) {
+    if (cmd == NULL)
+    {
         fprintf(stderr, "Failed to allocate memory");
         return 1;
     }
 
     cmd = trim(cmd);
 
-    if(strcmp(cmd, "help") == 0) {
-        if(argc >= 3) {
+    if (strcmp(cmd, "help") == 0)
+    {
+        if (argc >= 3)
+        {
             free(cmd);
             cmd = strdup(argv[2]);
             args = strdup("--help");
-        } else {
+        }
+        else
+        {
             fprintf(stderr, "Help command required.\n");
             goto clean;
         }
-    } else {
-        if(argc >= 3) {
+    }
+    else
+    {
+        if (argc >= 3)
+        {
             args = str_flatten(argv, 2, argc);
-            if(args == NULL) goto clean;
+            if (args == NULL)
+                goto clean;
         }
     }
 
@@ -178,18 +199,19 @@ int main(int argc, char **argv)
     debug(&debugger, "command '%s'", cmd);
 
     bin = which(command);
-    if(bin == NULL) {
+    if (bin == NULL)
+    {
         fprintf(stderr, "Unsupported command \"%s\"\n", cmd);
         goto clean;
     }
 
 #ifdef _WIN32
-    for(char *p = bin; *p; p++)
-        if(*p == '/')
+    for (char *p = bin; *p; p++)
+        if (*p == '/')
             *p = '\\';
 #endif
 
-    if(args) 
+    if (args)
         format(&commandArgs, "%s %s", bin, args);
     else
         format(&commandArgs, "%s", bin);
@@ -198,7 +220,8 @@ int main(int argc, char **argv)
 
     rc = system(commandArgs);
     debug(&debugger, "returned %d", rc);
-    if(rc > 255) rc = 1;
+    if (rc > 255)
+        rc = 1;
 
 clean:
     free(cmd);
