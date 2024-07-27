@@ -1,4 +1,0 @@
-[submodule "external/xruntime"]
-	path = external/xruntime
-	url = git@github.com:clusterO/xruntime.git
-	branch = main
