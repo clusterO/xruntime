@@ -1,6 +1,8 @@
 ﻿# xruntime
+- Compiler and XRuntime (OCC: generator, lexer, parser, model, semantic analysis) alignment
+- apply makefile learning curve to xruntime
 
-## The first goal of this project is to implement a web server
+## Phase 1: Implement a web server
 
 #### The major parts of this section are:
 
@@ -32,7 +34,7 @@ gcc server.c llist.c hashtable.c cache.c file.c mime.c net.c helpers/request.c -
 
 - [HTTP](https://developer.mozilla.org/en-US/docs/Web/HTTP)
 
-## The second phase is to add a dependency manager to the system
+## Phase 2: Add a dependency manager to the system
 
 - [x] Init & configure
 - [x] Install, Update and upgrade
@@ -47,7 +49,7 @@ gcc server.c llist.c hashtable.c cache.c file.c mime.c net.c helpers/request.c -
 - Maintenance costs should be borne mostly by those who get the benefit
 - A project must support being either a dependency provider or consumer transparently
 - Build definitions must not dictate how or from where a dependency should be obtained
-- Subprojects must be configured and build in solated sandboxes with narrow and explicit interfaces between them
+- Subprojects must be configured and build in isolated sandboxes with narrow and explicit interfaces between them
 - Try to support for simple cases of mixing build system (general case challenge)
 - Provide a centralised dependency downloader, but do not mandate its use
 
@@ -63,15 +65,15 @@ gcc cpm.c libs/asprintf.c libs/case.c libs/commander.c libs/console-colors.c lib
 - cpm -V
 - cpm help
 
-## The third phase is to incorporate object oriented and functional programming styles
+## Phase 3: Incorporate object oriented and functional programming styles
 
-- [x] OOC [OOC](https://ipfs.io/ipfs/bafykbzacebdwpzy4hih6puwm2vl746vponefnskbolmiuxmcbfjfe2gvnqrie?filename=Axel%20Schreiner%20-%20Object-Oriented%20Programming%20with%20ANSI-C%20%281993%29.pdf)
-- [_] FC [Functional C](https://ipfs.io/ipfs/bafykbzacedosuw6brb6mpmlwy7pex4kjtzcftrdhjk2thj4ppxtifcbjqckgy?filename=%28International%20Computer%20Science%20Series%29%20P.%20Hartel%2C%20F.%20Muller%20-%20Functional%20C-Addison-Wesley%20%281997%29.pdf)
+- [x] OOC [OAxel T. Schreiner - Object-Oriented Programming with ANSI-C](https://www.mclibre.org/descargar/docs/libros/ooc-ats.pdf)
+- [_] FC [Pieter H. Hartel - Functional C](https://archive.org/details/functionalc0000hart)
 - [_] Fix Wall Wextra
 - [_] Functional tests
 - [_] Refactor
 
-## The fourth phase is V8/TSC Binding
+## Phase 4: V8/TSC Binding
 
 - [_] Define phase
 - [_] CMake for build process
