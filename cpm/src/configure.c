@@ -237,10 +237,10 @@ static int configurePackage(const char *dir)
     if (!rootPackage)
     {
         const char *name = "manifest.json";
-        const *json = fs_read(name);
+        const char *json = fs_read(name);
 
         if (json)
-            rootPackage = newPkg(json, options.verbose);
+            rootPackage = newPackage(json, options.verbose);
 
         if (rootPackage && rootPackage->prefix)
         {
@@ -391,14 +391,14 @@ static int configurePackage(const char *dir)
             freePackage(dependency);
 
 #ifdef PTHREADS_HEADER
-            Thread *wrap = &wrap[i];
+            Thread *wrap = &wraps[i];
             pthread_t *thread = &threads[i];
             wrap->dir = depDir;
             rc = pthread_create(thread, 0, configurePackageThread, wrap);
 
             if (options.concurrency <= ++i)
             {
-                for (int j = 0; j < 0; ++j)
+                for (int j = 0; j < i; ++j)
                 {
                     pthread_join(threads[j], 0);
                     free((void *)wraps[j].dir);
@@ -463,7 +463,7 @@ static int configurePackage(const char *dir)
             rc = pthread_create(thread, 0, configurePackageThread, wrap);
             if (options.concurrency <= ++i)
             {
-                for (int j = 0; j < i, ++j)
+                for (int j = 0; j < i; ++j)
                 {
                     pthread_join(threads[j], 0);
                     free((void *)wraps[j].dir);

@@ -53,7 +53,7 @@ gcc src/server.c src/request.c src/cookie.c src/response.c src/session.c src/rou
 - [x] Install, Update and upgrade
 - [x] Build process
 - [x] DepSolver (SAT)
-- [_] CI/CD
+- [x] CI/CD
 
 #### Design principles
 

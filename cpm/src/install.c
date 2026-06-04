@@ -247,14 +247,14 @@ static int writeDependency(Package *pkg, char *prefix)
 
 static int saveDependency(Package *pkg)
 {
-    debug(&debugger, "savind dependency %s at %s", pkg->name, pkg->version);
+    debug(&debugger, "saving dependency %s at %s", pkg->name, pkg->version);
     return writeDependency(pkg, "dependencies");
 }
 
 static int saveDevDependency(Package *pkg)
 {
-    debug(&debugger, "savind dev dependency %s at %s", pkg->name, pkg->version);
-    return writeDependency(pkg, "develmopent");
+    debug(&debugger, "saving dev dependency %s at %s", pkg->name, pkg->version);
+    return writeDependency(pkg, "development");
 }
 
 void setDir(command_t *self)
@@ -284,7 +284,7 @@ void unsetVerbose(command_t *self)
 void setDev(command_t *self)
 {
     options.dev = 1;
-    debug(&debugger, "set develmopent flag");
+    debug(&debugger, "set development flag");
 }
 
 static void setSave(command_t *self)
@@ -296,7 +296,7 @@ static void setSave(command_t *self)
 static void setSaveDev(command_t *self)
 {
     options.savedev = 1;
-    debug(&debugger, "set save develmopent flag");
+    debug(&debugger, "set save development flag");
 }
 
 void setForce(command_t *self)
@@ -325,9 +325,9 @@ static void getInstallCommandOptions(command_t *program, int argc, char **argv)
     command_option(program, "-o", "--out <dir>", "Change the output directory 'default: deps'", setDir);
     command_option(program, "-P", "--prefix <dir>", "Change the prefix directory 'default: /usr/local'", setPrefix);
     command_option(program, "-q", "--quiet", "Disable verbose", unsetVerbose);
-    command_option(program, "-d", "--dev", "install develmopent dependency", setDev);
+    command_option(program, "-d", "--dev", "install development dependency", setDev);
     command_option(program, "-S", "--save", "Save dependency in manifest.json", setSave);
-    command_option(program, "-D", "--save-dev", "Save develmopent dependency to manifest.json", setSaveDev);
+    command_option(program, "-D", "--save-dev", "Save development dependency to manifest.json", setSaveDev);
     command_option(program, "-f", "--force", "Force the action", setForce);
     command_option(program, "-c", "--skip-cache", "Skip cache when installing", setSkipCache);
     command_option(program, "-g", "--global", "Global install", setGlobal);

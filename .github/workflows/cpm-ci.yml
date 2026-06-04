@@ -1,0 +1,129 @@
+name: CPM CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'cpm/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'cpm/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libcurl4-openssl-dev
+    
+    - name: Build CPM with ${{ matrix.compiler }}
+      working-directory: cpm
+      run: |
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          export CC=clang
+          export CXX=clang++
+        fi
+        make clean || true
+        make
+    
+    - name: Test CPM init
+      working-directory: cpm
+      run: |
+        ./cpm -h
+    
+    - name: Test CPM version
+      working-directory: cpm
+      run: |
+        ./cpm -v
+
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libcurl4-openssl-dev
+    
+    - name: Build CPM
+      working-directory: cpm
+      run: make
+    
+    - name: Create test project
+      run: |
+        mkdir -p /tmp/test-cpm-project
+        cd /tmp/test-cpm-project
+        /home/runner/work/xruntime/xruntime/cpm/cpm init
+    
+    - name: Test CPM configure
+      working-directory: /tmp/test-cpm-project
+      run: /home/runner/work/xruntime/xruntime/cpm/cpm/cpm -c
+    
+    - name: Test CPM build
+      working-directory: /tmp/test-cpm-project
+      run: /home/runner/work/xruntime/xruntime/cpm/cpm/cpm -b
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck clang-format
+    
+    - name: Run cppcheck
+      working-directory: cpm
+      run: |
+        cppcheck --enable=all --suppress=missingIncludeSystem src/ --error-exitcode=0
+    
+    - name: Check code style
+      working-directory: cpm
+      run: |
+        find src -name "*.c" -o -name "*.h" | xargs clang-format --dry-run --Werror || true
+
+  release:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libcurl4-openssl-dev
+    
+    - name: Build CPM
+      working-directory: cpm
+      run: make
+    
+    - name: Create release archive
+      working-directory: cpm
+      run: |
+        tar -czf cpm-linux-amd64.tar.gz cpm
+    
+    - name: Upload release asset
+      uses: actions/upload-artifact@v3
+      with:
+        name: cpm-linux-amd64
+        path: cpm/cpm-linux-amd64.tar.gz
