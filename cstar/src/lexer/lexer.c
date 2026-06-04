@@ -1,90 +1,124 @@
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
 #include "lexer.h"
 
-void lexer_init(Lexer *lexer, const char *source_code)
-{
+static int is_alpha(char c) {
+    return isalpha(c) || c == '_';
+}
+
+static int is_digit(char c) {
+    return isdigit(c);
+}
+
+static int is_whitespace(char c) {
+    return isspace(c);
+}
+
+void lexer_init(Lexer *lexer, const char *source_code) {
     lexer->input = source_code;
     lexer->input_length = strlen(source_code);
     lexer->current = 0;
+    lexer->line = 1;
+    lexer->column = 1;
 }
 
-Token lexer_next_token(Lexer *lexer)
-{
-    Token token;
-
-    // Initialize token values
-    token.type = TOKEN_UNKNOWN;
-    token.lexeme = NULL;
-
-    // Check if lexer has reached the end of input
-    if (lexer->current >= lexer->input_length)
-    {
-        token.type = TOKEN_EOF;
-        return token;
-    }
-
-    // Skip whitespace characters
-    while (is_whitespace(lexer->input[lexer->current]))
-    {
+static Token lexer_identifier(Lexer *lexer) {
+    size_t start = lexer->current;
+    while (lexer->current < lexer->input_length && (is_alpha(lexer->input[lexer->current]) || is_digit(lexer->input[lexer->current]))) {
         lexer->current++;
+        lexer->column++;
     }
 
-    // Check for end of input after skipping whitespace
-    if (lexer->current >= lexer->input_length)
-    {
-        token.type = TOKEN_EOF;
-        return token;
-    }
+    size_t length = lexer->current - start;
+    char *lexeme = malloc(length + 1);
+    strncpy(lexeme, lexer->input + start, length);
+    lexeme[length] = '\0';
 
-    // Get the current character
-    char current_char = lexer->input[lexer->current];
+    Token token;
+    token.lexeme = lexeme;
+    token.line = lexer->line;
+    token.column = lexer->column - (int)length;
 
-    // Determine the token type based on the current character
-    if (is_alpha(current_char))
-    {
-        token = lexer_identifier(lexer);
-    }
-    else if (is_digit(current_char))
-    {
-        token = lexer_number(lexer);
-    }
-    else
-    {
-        // Handle other token types such as operators, punctuation, etc.
-        // Implement your logic here based on the language grammar
-        // and return the appropriate token.
-        // Example:
-        // token = lexer_operator(lexer);
-        // token = lexer_punctuation(lexer);
+    // Check for keywords
+    if (strcmp(lexeme, "class") == 0 || strcmp(lexeme, "extends") == 0 || strcmp(lexeme, "method") == 0 || strcmp(lexeme, "variant") == 0) {
+        token.type = TOKEN_KEYWORD;
+    } else {
+        token.type = TOKEN_IDENTIFIER;
     }
 
     return token;
 }
 
-void token_free(Token *token)
-{
-    free(token->lexeme);
-    token->lexeme = NULL;
-    token->type = TOKEN_UNKNOWN;
+static Token lexer_number(Lexer *lexer) {
+    size_t start = lexer->current;
+    while (lexer->current < lexer->input_length && is_digit(lexer->input[lexer->current])) {
+        lexer->current++;
+        lexer->column++;
+    }
+
+    size_t length = lexer->current - start;
+    char *lexeme = malloc(length + 1);
+    strncpy(lexeme, lexer->input + start, length);
+    lexeme[length] = '\0';
+
+    Token token;
+    token.type = TOKEN_LITERAL;
+    token.lexeme = lexeme;
+    token.line = lexer->line;
+    token.column = lexer->column - (int)length;
+
+    return token;
 }
 
-const char *token_type_to_string(TokenType type)
-{
-    switch (type)
-    {
-    case TOKEN_IDENTIFIER:
-        return "IDENTIFIER";
-    case TOKEN_KEYWORD:
-        return "KEYWORD";
-    case TOKEN_LITERAL:
-        return "LITERAL";
-    case TOKEN_OPERATOR:
-        return "OPERATOR";
-    case TOKEN_SEPARATOR:
-        return "SEPARATOR";
-    case TOKEN_COMMENT:
-        return "COMMENT";
-    case TOKEN_UNKNOWN:
-    default:
-        return "UNKNOWN";
+Token lexer_next_token(Lexer *lexer) {
+    while (lexer->current < lexer->input_length && is_whitespace(lexer->input[lexer->current])) {
+        if (lexer->input[lexer->current] == '\n') {
+            lexer->line++;
+            lexer->column = 1;
+        } else {
+            lexer->column++;
+        }
+        lexer->current++;
+    }
+
+    if (lexer->current >= lexer->input_length) {
+        Token token = { TOKEN_EOF, NULL, lexer->line, lexer->column };
+        return token;
+    }
+
+    char c = lexer->input[lexer->current];
+
+    if (is_alpha(c)) return lexer_identifier(lexer);
+    if (is_digit(c)) return lexer_number(lexer);
+
+    // Operators and Separators
+    char *lexeme = malloc(2);
+    lexeme[0] = c;
+    lexeme[1] = '\0';
+    lexer->current++;
+    lexer->column++;
+
+    TokenType type = TOKEN_UNKNOWN;
+    if (strchr("{}:;,", c)) type = TOKEN_SEPARATOR;
+    else if (strchr("+-*/=", c)) type = TOKEN_OPERATOR;
+
+    Token token = { type, lexeme, lexer->line, lexer->column - 1 };
+    return token;
+}
+
+void token_free(Token *token) {
+    if (token->lexeme) free(token->lexeme);
+}
+
+const char *token_type_to_string(TokenType type) {
+    switch (type) {
+        case TOKEN_KEYWORD: return "KEYWORD";
+        case TOKEN_IDENTIFIER: return "IDENTIFIER";
+        case TOKEN_LITERAL: return "LITERAL";
+        case TOKEN_OPERATOR: return "OPERATOR";
+        case TOKEN_SEPARATOR: return "SEPARATOR";
+        case TOKEN_EOF: return "EOF";
+        default: return "UNKNOWN";
     }
 }

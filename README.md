@@ -78,12 +78,13 @@ gcc src/cpm.c libs/asprintf.c libs/case.c libs/commander.c libs/console-colors.c
 - cpm -V
 - cpm help
 
-## Phase 3: Incorporate object oriented and functional programming styles
+## Phase 3: Object-Oriented and Functional C Extensions
 
-- [_] OOC [Axel T. Schreiner - Object-Oriented Programming with ANSI-C](https://www.mclibre.org/descargar/docs/libros/ooc-ats.pdf)
-- [_] FC [Pieter H. Hartel - Functional C](https://archive.org/details/functionalc0000hart)
-- [_] Functional tests
-- [_] Refactor
+- [x] COOP: Object-Oriented Programming in C ([Axel T. Schreiner - Object-Oriented Programming with ANSI-C](https://www.mclibre.org/descargar/docs/libros/ooc-ats.pdf))
+- [x] CFP: Functional Programming in C ([Pieter H. Hartel - Functional C](https://archive.org/details/functionalc0000hart))
+- [x] C-Star Preprocessor: Automated Transpilation for OOP and FP
+- [x] Functional and Integration Tests
+- [x] Refactor and Runtime Integration
 
 ## Phase 4: V8/TSC Binding
 
