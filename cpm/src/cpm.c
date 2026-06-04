@@ -29,14 +29,14 @@ static void compareVersions(const JSON_Object *res, const char *marker)
         logger_info("info", "New version is available. use upgrade --tag %s", latestVersion);
 }
 
-static int getCpmCommandOptions(command_t *program, char *args, char *argv, int argc)
+static int getCpmCommandOptions(command_t *program, char *args, char **argv, int argc)
 {
     command_init(program, "cpm", VERSION);
     program->usage = "[options] [name <>]";
 
-    command_option(program, NULL, NULL, "", printf("%s\n", usage));
-    command_option(program, "-v", "version", "Show version", printf("VERSION: %s\n", VERSION));
-    command_option(program, "-V", "version", "Show version", printf("VERSION: %s\n", VERSION));
+    command_option(program, NULL, NULL, "", NULL);
+    command_option(program, "-v", "version", "Show version", NULL);
+    command_option(program, "-V", "version", "Show version", NULL);
     command_option(program, "-b", "build", "Build packages", NULL);
     command_option(program, "-c", "config", "Configure CPM", NULL);
     command_option(program, "-i", "install  <package | .>", "Install packages", NULL);

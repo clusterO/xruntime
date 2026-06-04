@@ -2,7 +2,7 @@
 #ifndef GUMBO_GET_ELEMENTS_BY_TAG_NAME_H
 #define GUMBO_GET_ELEMENTS_BY_TAG_NAME_H 1
 
-#include "../libs/list.h"
+#include "../list.h"
 #include "gumbo.h"
 
 list_t *

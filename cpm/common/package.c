@@ -1025,7 +1025,7 @@ static int fetchFile(Package *pkg, const char *dir, char *file, int verbose)
 
     _debug("File URL: %s", url);
 
-    if (!(path = path_join, (dir, basename(file))))
+    if (!(path = path_join(dir, basename(file))))
     {
         rc = 1;
         goto clean;
@@ -1147,12 +1147,13 @@ static int fetchPackage(Package *pkg, const char *dir, char *file, int verbose, 
 #endif
 }
 
-void freeDependency(Dependency *dep)
+void freeDependency(void *dep)
 {
-    free(dep->name);
-    free(dep->author);
-    free(dep->version);
-    free(dep);
+    Dependency *d = (Dependency *)dep;
+    free(d->name);
+    free(d->author);
+    free(d->version);
+    free(d);
 }
 
 void setPackageOptions(Options opts)
@@ -1176,13 +1177,13 @@ void setPackageOptions(Options opts)
         if (strlen(opts.prefix) == 0)
             defaultOptions.prefix = 0;
         else
-            defaultOptions.prefix = 1;
+            defaultOptions.prefix = opts.prefix;
 
     if (opts.token != 0)
         if (strlen(opts.token) == 0)
             defaultOptions.token = 0;
         else
-            defaultOptions.token = 1;
+            defaultOptions.token = opts.token;
 
     if (opts.concurrency)
         defaultOptions.concurrency = opts.concurrency;
@@ -1288,7 +1289,7 @@ static inline char *jsonObjectGetStringSafe(JSON_Object *obj, const char *key)
     return strdup(val);
 }
 
-static inline char *jsonArrayGetStringSafe(JSON_Array *arr, const char *i)
+static inline char *jsonArrayGetStringSafe(JSON_Array *arr, size_t i)
 {
     const char *val = json_array_get_string(arr, i);
     if (!val)
@@ -1399,7 +1400,7 @@ clean:
 
     iterator = list_iterator_new(freeList, LIST_HEAD);
 
-    while ((node = list_iterator_new(iterator, LIST_HEAD)))
+    while ((node = list_iterator_next(iterator)))
     {
         Package *package = node->val;
         if (package)

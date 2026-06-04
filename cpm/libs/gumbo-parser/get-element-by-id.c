@@ -21,8 +21,7 @@ GumboNode *gumbo_get_element_by_id(const char *id, GumboNode *document)
     return NULL;
   }
 
-  GumboAttribute *node_id =
-      (&document->v.element.attributes, "id");
+  GumboAttribute *node_id = gumbo_get_attribute(&document->v.element.attributes, "id");
   if (node_id && 0 == strcmp(id, node_id->value))
   {
     return document;

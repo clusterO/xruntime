@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "gumbo.h"
-#include "../libs/list.h"
-#include "../libs/trim.h"
-#include "../libs/case.h"
+#include "../list.h"
+#include "../trim.h"
+#include "../case.h"
 
 #define NODE_TYPE_CHECK(node)           \
   if (GUMBO_NODE_DOCUMENT != node->type \

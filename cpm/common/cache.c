@@ -8,7 +8,7 @@ static time_t cacheExpiration;
 
 const char *getCachePath()
 {
-    return packageCachePath;
+    return packageCacheDirectory;
 }
 
 int initCache(void)
