@@ -15,19 +15,20 @@
 #include <sys/file.h>
 #include <fcntl.h>
 
-#include "net.h"
-#include "file.h"
-#include "mime.h"
-#include "cache.h"
-#include "hashtable.h"
+#include "../common/net.h"
+#include "../common/file.h"
+#include "../common/mime.h"
+#include "../common/cache.h"
+#include "../common/hashtable.h"
 #include "request.h"
+#include "../common/thread_pool.h"
 
 #define MAX_RESPONSE_SIZE 262144
 #define PORT "3490"
 
 extern int response(int fd, const char *header, const char *contentType, const char *body, int contentLength);
 extern void request(int fd, struct Cache *cache);
-extern int server();
+extern int server(int thread_count);
 // request builder
 // response parser
 

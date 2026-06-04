@@ -1,4 +1,6 @@
 #include "request.h"
+#include <stdlib.h>
+#include <string.h>
 
 // FIX - conflicting types for ‘getData’
 struct Data *getData(int fd, struct Cache *cache, const char *path, char *mimeType)
@@ -15,15 +17,21 @@ struct Data *getData(int fd, struct Cache *cache, const char *path, char *mimeTy
         if (fileData == NULL)
             return NULL;
 
-        mimeType = getMimeType(filePath);
+        if (mimeType)
+            strcpy(mimeType, getMimeType(filePath));
     }
     else if (strcmp(path, "/data") == 0) // contain endpoint
     {
-        char *body = "{'key': 'value'}";
-        fileData->data = body;
-        fileData->size = sizeof(char) * strlen(fileData->data);
+        fileData = (struct Data *)malloc(sizeof(struct Data));
+        if (fileData == NULL)
+            return NULL;
 
-        mimeType = "application/json";
+        char *body = "{\"key\": \"value\"}";
+        fileData->data = strdup(body);
+        fileData->size = strlen(body);
+
+        if (mimeType)
+            strcpy(mimeType, "application/json");
     }
     else
         return NULL;
@@ -50,6 +58,26 @@ struct Data *notFound(int fd)
     return fileData;
 }
 
+/**
+ * Find the start of the body in an HTTP request
+ * Searches for the blank line that separates headers from body
+ * 
+ * @param header The HTTP request string
+ * @return Pointer to the start of the body, or NULL if no body found
+ */
 char *findBodyStart(char *header)
 {
+    if (header == NULL)
+        return NULL;
+
+    // HTTP headers end with \r\n\r\n or \n\n
+    char *bodyStart = strstr(header, "\r\n\r\n");
+    if (bodyStart != NULL)
+        return bodyStart + 4;
+
+    bodyStart = strstr(header, "\n\n");
+    if (bodyStart != NULL)
+        return bodyStart + 2;
+
+    return NULL;
 }

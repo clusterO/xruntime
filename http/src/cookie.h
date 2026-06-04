@@ -1,6 +1,8 @@
 #ifndef _COOKIE_HEADER_
 #define _COOKIE_HEADER_
 
+#include <time.h>
+
 typedef struct {
     char *name;
     char *value;

@@ -1,6 +1,8 @@
 #ifndef _RESPONSE_HEADER_
 #define _RESPONSE_HEADER_
 
+#include <stddef.h>
+
 typedef struct {
     int status;
     char *content;

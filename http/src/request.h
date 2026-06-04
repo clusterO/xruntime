@@ -4,6 +4,8 @@
 #include <stdio.h>
 
 #include "../common/file.h"
+#include "../common/mime.h"
+#include "../common/cache.h"
 
 #define SERVER_FILES "./serverfiles"
 #define SERVER_ROOT "./serverroot"

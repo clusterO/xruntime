@@ -9,14 +9,27 @@
 - [x] An http request handler
 - [x] An http response builder
 - [x] A caching mechanism (LRU)
-- [_] Concurency manager
-- [_] See code comments
+- [x] Concurrency manager (thread pool)
+- [x] Code comments and documentation
+- [x] Cookie management
+- [x] Session management
+- [x] Router implementation
 
 #### Compile using GCC
 
 ```bash
 cd http
-gcc server.c llist.c hashtable.c cache.c file.c mime.c net.c helpers/request.c -o server -w
+gcc src/server.c src/request.c src/cookie.c src/response.c src/session.c src/router.c common/cache.c common/hashtable.c common/linked_list.c common/mime.c common/net.c common/file.c common/thread_pool.c -o server -lpthread -w
+```
+
+#### Run the server
+
+```bash
+# Run with default 4 worker threads
+./server
+
+# Run with custom number of worker threads
+./server 8
 ```
 
 #### Test HTTP server
