@@ -80,9 +80,8 @@ gcc src/cpm.c libs/asprintf.c libs/case.c libs/commander.c libs/console-colors.c
 
 ## Phase 3: Incorporate object oriented and functional programming styles
 
-- [x] OOC [OAxel T. Schreiner - Object-Oriented Programming with ANSI-C](https://www.mclibre.org/descargar/docs/libros/ooc-ats.pdf)
+- [_] OOC [Axel T. Schreiner - Object-Oriented Programming with ANSI-C](https://www.mclibre.org/descargar/docs/libros/ooc-ats.pdf)
 - [_] FC [Pieter H. Hartel - Functional C](https://archive.org/details/functionalc0000hart)
-- [_] Fix Wall Wextra
 - [_] Functional tests
 - [_] Refactor
 
