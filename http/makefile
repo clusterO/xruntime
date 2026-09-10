@@ -1,0 +1,1 @@
+gcc server.c llist.c hashtable.c cache.c file.c mime.c net.c helpers/request.c -o server -w
